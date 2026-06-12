@@ -44,12 +44,12 @@ export const translations: Record<string, string> = {
   "Emergency Block Activated. Settlement logs locked safely.": "تم تفعيل قفل الطوارئ. تم تأمين سجلات التسوية بنجاح.",
   "Emergency Ledger Block Activated.": "تم تنشيط قفل دفتر الحسابات في حالات الطوارئ.",
   "Emergency Block Active": "قفل الطوارئ نشط",
-  "FinLux Workspace": "مسير عمل FinLux",
-  "FinLux P2P": "فينلوكس P2P",
+  "OnTarget Workspace": "مساحة عمل أون تارجت",
+  "OnTarget": "أون تارجت",
   "ISO documentation": "وثائق ISO العالمية",
   "Sandbox operational keys active.": "نشط مفاتيح التشغيل في البيئة التجريبية.",
   "API keys API": "مفاتيح ربط الواجهة (API)",
-  "© 2026 FinLux P2P Solutions Node Operations. London & Cairo Nodes Optimal.": "حقوق الطبع © 2026 فينلوكس P2P. العقد التشغيلية في لندن والقاهرة تعمل بالمستوى الأمثل.",
+  "© 2026 OnTarget Solutions. London & Cairo Nodes Optimal.": "حقوق الطبع © 2026 أون تارجت. العقد التشغيلية في لندن والقاهرة تعمل بالمستوى الأمثل.",
 
   // Executive summary
   "Executive Summary 📈": "التقرير التنفيذي 📈",

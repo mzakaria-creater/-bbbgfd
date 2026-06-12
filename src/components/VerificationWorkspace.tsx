@@ -26,7 +26,7 @@ export default function VerificationWorkspace() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-3">
-        <div><p className="text-[10px] uppercase tracking-[0.2em] font-bold text-primary">Sovereign Ledger</p><h1 className="text-3xl font-extrabold tracking-tight">Admin Verification Workspace</h1><p className="text-sm text-on-surface-variant mt-1">Deep proof review and transaction queue operations.</p></div>
+        <div><p className="text-[10px] uppercase tracking-[0.2em] font-bold text-primary">OnTarget Ledger</p><h1 className="text-3xl font-extrabold tracking-tight">Admin Verification Workspace</h1><p className="text-sm text-on-surface-variant mt-1">Deep proof review and transaction queue operations.</p></div>
         <div className="flex gap-2"><span className="px-3 py-2 rounded-lg bg-surface-container-low text-xs font-bold">System Health: 99.8%</span><span className="px-3 py-2 rounded-lg bg-blue-100 text-blue-800 text-xs font-bold">Queue: {transactions.length} Requests</span></div>
       </div>
 

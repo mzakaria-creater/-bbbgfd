@@ -23,7 +23,8 @@ import {
   Sliders,
   MessageSquareText,
   ShieldEllipsis,
-  Code2
+  Code2,
+  ShoppingBag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LanguageProvider, useTranslation } from './context/LanguageContext';
@@ -45,6 +46,7 @@ import WalletDashboard from './components/WalletDashboard';
 import OrangeSmsReader from './components/OrangeSmsReader';
 import VerificationWorkspace from './components/VerificationWorkspace';
 import DeveloperDocs from './components/DeveloperDocs';
+import Checkout from './components/Checkout';
 
 function BaseLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -107,6 +109,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
     { to: '/orange-sms', label: 'Orange SMS Reader', icon: <MessageSquareText className="w-4 h-4" /> },
     { to: '/verification', label: 'Verification Workspace', icon: <ShieldEllipsis className="w-4 h-4" /> },
     { to: '/developers', label: 'Developer API Docs', icon: <Code2 className="w-4 h-4" /> },
+    { to: '/checkout', label: 'OnTarget Checkout', icon: <ShoppingBag className="w-4 h-4" /> },
     { to: '/wallet-dashboard', label: 'Wallet Dashboard', icon: <Sliders className="w-4 h-4" /> },
     { to: '/treasury', label: 'Treasury Hub', icon: <DollarSign className="w-4 h-4" /> },
     { to: '/operator-cockpit', label: 'Operator Cockpit', icon: <History className="w-4 h-4" /> },
@@ -143,7 +146,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-white font-extrabold shadow-sm">
               <Sparkles className="w-4 h-4" />
             </div>
-            <span className="text-sm font-black tracking-tight text-primary">FinLux Go</span>
+            <span className="text-sm font-black tracking-tight text-primary">OnTarget Go</span>
             <span className="px-1.5 py-0.5 bg-[#6cf8bb]/20 text-[#006c49] text-[8px] font-black uppercase tracking-wider rounded">
               {t("LIVE")}
             </span>
@@ -257,7 +260,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
                       <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center text-white font-extrabold transform rotate-2">
                         <Sparkles className="w-4 h-4" />
                       </div>
-                      <span className="text-sm font-black text-primary">FinLux Options</span>
+                      <span className="text-sm font-black text-primary">OnTarget Options</span>
                     </div>
                     <button className="p-1 rounded-full hover:bg-slate-100" onClick={() => setMobileMenuOpen(false)}>
                       <X className="w-5 h-5 text-on-surface" />
@@ -565,7 +568,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-extrabold shadow-md transform rotate-2">
               <Sparkles className="w-4.5 h-4.5" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-primary">{t("FinLux P2P")}</span>
+            <span className="text-xl font-bold tracking-tight text-primary">OnTarget</span>
           </div>
         </div>
 
@@ -829,7 +832,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
                       <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-extrabold">
                         <Sparkles className="w-4 h-4" />
                       </div>
-                      <span className="text-lg font-bold text-primary">{t("FinLux Workspace")}</span>
+                      <span className="text-lg font-bold text-primary">OnTarget Workspace</span>
                     </div>
                     <button className="p-1" onClick={() => setMobileMenuOpen(false)}>
                       <X className="w-5 h-5 text-on-surface" />
@@ -889,7 +892,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
 
       {/* Global Status Bar Footer */}
       <footer className={`w-full ${widthBoundClass} mx-auto px-6 md:px-12 py-6 border-t border-outline-variant/30 flex flex-col md:flex-row items-center justify-between text-xs text-on-surface-variant font-bold gap-4 z-10 bg-transparent`}>
-        <span>{t("© 2026 FinLux P2P Solutions Node Operations. London & Cairo Nodes Optimal.")}</span>
+        <span>© 2026 OnTarget Solutions. London & Cairo Nodes Optimal.</span>
         <div className="flex items-center gap-4">
           <span className="hover:text-primary cursor-pointer" onClick={() => alert(t("Loading documentation index..."))}>{t("ISO documentation")}</span>
           <span>•</span>
@@ -914,6 +917,7 @@ export default function App() {
               <Route path="/orange-sms" element={<PermissionGuard pageName="Orange SMS Reader"><OrangeSmsReader /></PermissionGuard>} />
               <Route path="/verification" element={<PermissionGuard pageName="Verification Workspace"><VerificationWorkspace /></PermissionGuard>} />
               <Route path="/developers" element={<PermissionGuard pageName="Developer API Docs"><DeveloperDocs /></PermissionGuard>} />
+              <Route path="/checkout" element={<PermissionGuard pageName="OnTarget Checkout"><Checkout /></PermissionGuard>} />
               <Route path="/wallet-dashboard" element={<PermissionGuard pageName="Wallet Dashboard"><WalletDashboard /></PermissionGuard>} />
               <Route path="/treasury" element={<PermissionGuard pageName="Treasury Hub"><TreasuryHub /></PermissionGuard>} />
               <Route path="/operator-cockpit" element={<PermissionGuard pageName="Operator Cockpit"><OperatorCockpit /></PermissionGuard>} />

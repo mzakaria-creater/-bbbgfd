@@ -52,7 +52,7 @@ export default function DeveloperDocs() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-        <div><div className="flex items-center gap-2"><div className="w-9 h-9 bg-blue-700 text-white rounded-lg flex items-center justify-center"><WalletCards className="w-5 h-5" /></div><h1 className="text-3xl font-extrabold tracking-tight">Sovereign Ledger Developers</h1></div><p className="text-sm text-on-surface-variant mt-2">API reference, examples, and an interactive test console.</p></div>
+        <div><div className="flex items-center gap-2"><div className="w-9 h-9 bg-blue-700 text-white rounded-lg flex items-center justify-center"><WalletCards className="w-5 h-5" /></div><h1 className="text-3xl font-extrabold tracking-tight">OnTarget Developers</h1></div><p className="text-sm text-on-surface-variant mt-2">API reference, examples, and an interactive test console.</p></div>
         <label className="flex items-center gap-2 bg-white border border-outline-variant/40 rounded-xl px-4 py-2.5"><Search className="w-4 h-4 text-outline" /><input className="outline-none bg-transparent text-xs min-w-56" placeholder="Search documentation..." /></label>
       </div>
 
@@ -67,7 +67,7 @@ export default function DeveloperDocs() {
         <main className="col-span-12 lg:col-span-6 xl:col-span-7 p-7 xl:p-12 overflow-y-auto">
           <div className="flex items-center gap-2 mb-4"><span className="bg-blue-100 text-blue-800 text-[9px] font-bold px-2 py-1 rounded uppercase">Post</span><code className="text-xs text-on-surface-variant">/v1/transactions</code></div>
           <h2 className="text-4xl xl:text-5xl font-extrabold tracking-tight">Create a Transaction</h2>
-          <p className="text-base text-on-surface-variant leading-relaxed mt-5 mb-10">Use this endpoint to initiate a new payment transaction across the Sovereign Ledger ecosystem. All transactions are processed in real time and require an idempotent key for safety.</p>
+          <p className="text-base text-on-surface-variant leading-relaxed mt-5 mb-10">Use this endpoint to initiate a new payment transaction across the OnTarget ecosystem. All transactions are processed in real time and require an idempotent key for safety.</p>
           <h3 className="font-bold text-lg border-l-4 border-blue-700 pl-3 mb-4">Request Parameters</h3>
           {[['amount', 'integer · required', 'A positive integer in the smallest currency unit. The minimum amount is 50 units.'], ['currency', 'string · required', 'Three-letter ISO currency code in lowercase. Must be a supported currency.'], ['description', 'string · optional', 'An arbitrary string attached to the object for display and reconciliation.']].map(row => <div key={row[0]} className="py-5 border-b flex flex-col sm:flex-row gap-3 sm:gap-10"><div className="sm:w-1/3"><code className="text-blue-700 font-bold text-xs">{row[0]}</code><p className="text-[9px] font-mono text-on-surface-variant mt-1">{row[1]}</p></div><p className="text-xs text-on-surface-variant flex-1 leading-relaxed">{row[2]}</p></div>)}
           <h3 className="font-bold text-lg border-l-4 border-blue-700 pl-3 mt-10 mb-4">Response Schema</h3>
