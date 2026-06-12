@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -18,7 +18,8 @@ import {
   Sparkles,
   HelpCircle,
   Menu,
-  X
+  X,
+  Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LanguageProvider, useTranslation } from './context/LanguageContext';
@@ -33,6 +34,7 @@ import Disputes from './components/Disputes';
 import RBACStudio from './components/RBACStudio';
 import Commissions from './components/Commissions';
 import MerchantPortal from './components/MerchantPortal';
+import WalletAllocationEngine from './components/WalletAllocationEngine';
 
 function BaseLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -40,6 +42,33 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  // 4K Glossy Desktop Landscape states
+  const [viewportWidth, setViewportWidth] = useState<'classic' | 'panoramic' | '4k-ultra'>(() => {
+    return (localStorage.getItem('finlux_viewport_width') as any) || '4k-ultra';
+  });
+  const [glossyLuster, setGlossyLuster] = useState<'glossy' | 'matte'>(() => {
+    return (localStorage.getItem('finlux_glossy_luster') as any) || 'glossy';
+  });
+  const [displayScale, setDisplayScale] = useState<number>(() => {
+    return Number(localStorage.getItem('finlux_display_scale')) || 95;
+  });
+
+  const saveViewportWidth = (val: 'classic' | 'panoramic' | '4k-ultra') => {
+    setViewportWidth(val);
+    localStorage.setItem('finlux_viewport_width', val);
+  };
+
+  const saveGlossyLuster = (val: 'glossy' | 'matte') => {
+    setGlossyLuster(val);
+    localStorage.setItem('finlux_glossy_luster', val);
+  };
+
+  const saveDisplayScale = (val: number) => {
+    const clamped = Math.max(75, Math.min(125, val));
+    setDisplayScale(clamped);
+    localStorage.setItem('finlux_display_scale', clamped.toString());
+  };
 
   const notifications = [
     { id: 1, title: t("Disbursement Alert"), desc: t("Payout batch approved for Delta Group"), time: t("5 mins ago"), unread: true },
@@ -50,6 +79,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { to: '/', label: 'Admin Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { to: '/payment-methods', label: 'Payment Methods', icon: <CreditCard className="w-4 h-4" /> },
+    { to: '/wallet-allocation', label: 'Wallet Allocation', icon: <Smartphone className="w-4 h-4" /> },
     { to: '/treasury', label: 'Treasury Hub', icon: <DollarSign className="w-4 h-4" /> },
     { to: '/operator-cockpit', label: 'Operator Cockpit', icon: <History className="w-4 h-4" /> },
     { to: '/local-depositors', label: 'Local Depositors', icon: <Users className="w-4 h-4" /> },
@@ -59,8 +89,122 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
     { to: '/merchant-portal', label: 'Merchant Dashboard', icon: <UserCheck className="w-4 h-4" /> }
   ];
 
+  // Dynamic width classes based on 4K Landscape Setup
+  const widthBoundClass = 
+    viewportWidth === 'classic' ? 'max-w-7xl' : 
+    viewportWidth === 'panoramic' ? 'max-w-[1550px]' : 
+    'max-w-[1880px]';
+
   return (
-    <div dir={langDir} className="min-h-screen bg-[#faf9fe] text-[#1a1b1f] flex flex-col font-sans transition-all duration-300">
+    <div 
+      dir={langDir} 
+      className={`min-h-screen text-[#1a1b1f] flex flex-col font-sans transition-all duration-300 relative ${
+        glossyLuster === 'glossy' 
+          ? 'bg-gradient-to-br from-[#f6f5fa] via-[#faf9fe] to-[#f0eef7]' 
+          : 'bg-[#faf9fe]'
+      }`}
+    >
+      
+      {/* 4K Landscape Atmospheric Neon Glow Spheres (Ambient drift under frosted panels) */}
+      {glossyLuster === 'glossy' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div className="absolute top-[5%] left-[10%] w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-primary/8 to-indigo-300/10 blur-[90px] animate-pulse" />
+          <div className="absolute bottom-[10%] right-[10%] w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-secondary/8 to-teal-200/5 blur-[110px] animate-pulse" style={{ animationDuration: '9s' }} />
+          <div className="absolute top-[40%] right-[25%] w-[400px] h-[400px] rounded-full bg-gradient-to-br from-purple-400/5 to-pink-500/5 blur-[80px] animate-pulse" style={{ animationDuration: '14s' }} />
+        </div>
+      )}
+
+      {/* Glossy Luster Light Reflective Specular Overlay (Gloss design overlay) */}
+      {glossyLuster === 'glossy' && (
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-white/0 via-white/80 to-white/0 pointer-events-none z-50 shadow-[0_1px_15px_rgba(255,255,255,0.8)]" />
+      )}
+
+      {/* 4K ULTRA-DESK MASTER PRESENTER HUD */}
+      <div className="w-full bg-[#101115] text-slate-300 py-1.5 px-4 md:px-8 text-[11px] font-mono flex flex-wrap justify-between items-center gap-3 border-b border-[#20222a] z-50 shadow-sm relative">
+        <div className="flex items-center gap-3">
+          <span className="flex h-2 w-2 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-400"></span>
+          </span>
+          <span className="font-bold tracking-wider text-slate-100 uppercase">🖥️ Widescreen 4K Console Mode Active</span>
+          <span className="text-slate-500">|</span>
+          <span className="text-slate-400 hidden sm:inline">Format: <strong className="text-primary-container font-extrabold">3840×2160 (60Hz) Optimal</strong></span>
+          <span className="text-slate-500 hidden sm:inline">|</span>
+          <span className="text-emerald-400 font-semibold uppercase text-[10px] tracking-widest hidden md:inline">Glossy Luster Rendering on High-DPI screens</span>
+        </div>
+
+        {/* Viewport & Glossy Configuration HUD Controller */}
+        <div className="flex items-center gap-4 text-xs font-sans">
+          
+          {/* Panoramic Selector */}
+          <div className="flex items-center gap-1 bg-slate-800/60 p-0.5 rounded-lg border border-slate-700">
+            <button 
+              onClick={() => saveViewportWidth('classic')}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${viewportWidth === 'classic' ? 'bg-primary text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Classic 1280px Grid"
+            >
+              Classic
+            </button>
+            <button 
+              onClick={() => saveViewportWidth('panoramic')}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${viewportWidth === 'panoramic' ? 'bg-primary text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Wide HD 1550px"
+            >
+              HD Wide
+            </button>
+            <button 
+              onClick={() => saveViewportWidth('4k-ultra')}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${viewportWidth === '4k-ultra' ? 'bg-primary text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Ultra 4K 1880px Canvas"
+            >
+              4K Ultra-Wide
+            </button>
+          </div>
+
+          {/* Luster Gloss Toggle */}
+          <div className="flex items-center gap-1 bg-slate-800/60 p-0.5 rounded-lg border border-slate-700">
+            <button 
+              onClick={() => saveGlossyLuster('glossy')}
+              className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${glossyLuster === 'glossy' ? 'bg-[#006c49] text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="High gloss frosted glass finish with colorful reflections"
+            >
+              <Sparkles className="w-2.5 h-2.5" />
+              Glossy Glass
+            </button>
+            <button 
+              onClick={() => saveGlossyLuster('matte')}
+              className={`px-2.5 py-0.5 rounded text-[10px] font-medium transition-all ${glossyLuster === 'matte' ? 'bg-slate-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Standard flat background design"
+            >
+              Matte
+            </button>
+          </div>
+
+          <div className="h-4 w-px bg-slate-700 hidden sm:block" />
+
+          {/* Scale Tuner */}
+          <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono text-slate-400">
+            <span>Density Scale:</span>
+            <div className="flex items-center gap-1.5 bg-slate-800/60 px-2 py-1 rounded-md border border-slate-700/60">
+              <button 
+                onClick={() => saveDisplayScale(displayScale - 5)}
+                className="hover:text-white font-extrabold pr-1 cursor-pointer"
+                title="Decrease Scale"
+              >
+                -
+              </button>
+              <span className="text-slate-100 font-bold">{displayScale}%</span>
+              <button 
+                onClick={() => saveDisplayScale(displayScale + 5)}
+                className="hover:text-white font-extrabold pl-1 cursor-pointer"
+                title="Increase Scale"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       
       {/* Click capture overlays when dropdowns are open */}
       {(notificationsOpen || profileOpen) && (
@@ -73,8 +217,12 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
         />
       )}
       
-      {/* Dynamic Top Navigation Bar */}
-      <header className="sticky top-0 z-40 w-full h-16 bg-[#faf9fe]/80 backdrop-blur-xl border-b border-outline-variant/30 flex items-center justify-between px-6 md:px-12 max-w-7xl mx-auto left-0 right-0 shadow-xs shadow-primary/5">
+      {/* Dynamic Top Navigation Bar with Glossy Glassmorphic class matching */}
+      <header className={`sticky top-0 z-40 w-full h-16 transition-all duration-300 ${
+        glossyLuster === 'glossy' 
+          ? 'bg-white/70 backdrop-blur-xl border-b border-white/40 shadow-xs' 
+          : 'bg-[#faf9fe]/80 backdrop-blur-xl border-b border-outline-variant/30'
+      } flex items-center justify-between px-6 md:px-12 ${widthBoundClass} mx-auto left-0 right-0 shadow-xs`}>
         <div className="flex items-center gap-4">
           <button 
             className="lg:hidden p-1.5 hover:bg-surface-container rounded-lg"
@@ -261,11 +409,22 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Main Core View Area */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-12 py-8 flex gap-8">
+      {/* Main Core View Area - Supports dynamic widths and layouts of our landscape workspace */}
+      <div 
+        className={`flex-1 ${widthBoundClass} w-full mx-auto px-4 md:px-12 py-8 flex gap-8 z-10 transition-all duration-300`}
+        style={{ 
+          transform: `scale(${displayScale / 100})`, 
+          transformOrigin: 'top center',
+          marginBottom: `${(100 - displayScale) * -0.5}vh` // adjust screen offset for high fidelity scale bounds
+        }}
+      >
         
-        {/* Desktop Sidebar (1/4 width) */}
-        <aside className="hidden lg:flex flex-col gap-2 p-4 h-[calc(100vh-10rem)] w-72 bg-surface-container-low border border-outline-variant/50 rounded-3xl sticky top-24">
+        {/* Desktop Sidebar (1/4 width) styled with glossy parameters */}
+        <aside className={`hidden lg:flex flex-col gap-2 p-4 h-[calc(100vh-12rem)] w-72 sticky top-24 transition-all duration-300 ${
+          glossyLuster === 'glossy' 
+            ? 'bg-white/50 backdrop-blur-xl border border-white/40 shadow-xs' 
+            : 'bg-surface-container-low border border-outline-variant/50'
+        } rounded-3xl`}>
           <div className="mb-6 px-2">
             <h2 className="text-base font-extrabold text-primary">{t("Admin Control Suite")}</h2>
             <p className="text-[10px] text-on-surface-variant uppercase tracking-wider font-extrabold opacity-70">{t("P2P Network Core")}</p>
@@ -386,7 +545,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Global Status Bar Footer */}
-      <footer className="w-full max-w-7xl mx-auto px-6 md:px-12 py-6 border-t border-outline-variant/30 flex flex-col md:flex-row items-center justify-between text-xs text-on-surface-variant font-bold gap-4">
+      <footer className={`w-full ${widthBoundClass} mx-auto px-6 md:px-12 py-6 border-t border-outline-variant/30 flex flex-col md:flex-row items-center justify-between text-xs text-on-surface-variant font-bold gap-4 z-10 bg-transparent`}>
         <span>{t("© 2026 FinLux P2P Solutions Node Operations. London & Cairo Nodes Optimal.")}</span>
         <div className="flex items-center gap-4">
           <span className="hover:text-primary cursor-pointer" onClick={() => alert(t("Loading documentation index..."))}>{t("ISO documentation")}</span>
@@ -407,6 +566,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<AdminDashboard />} />
             <Route path="/payment-methods" element={<PaymentMethods />} />
+            <Route path="/wallet-allocation" element={<WalletAllocationEngine />} />
             <Route path="/treasury" element={<TreasuryHub />} />
             <Route path="/operator-cockpit" element={<OperatorCockpit />} />
             <Route path="/local-depositors" element={<LocalDepositors />} />

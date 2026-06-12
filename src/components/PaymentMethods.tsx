@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Smartphone, 
@@ -30,37 +30,213 @@ export default function PaymentMethods() {
   // --- STORES & COMPONENT DATA STATE ---
   
   // Custom Pools
-  const [pools, setPools] = useState([
-    { id: 'pool-1', name: 'High-Priority Ingress Pool', description: 'Primary high-speed pool for active deposits', enabled: true, status: 'Active' },
-    { id: 'pool-2', name: 'VIP Settlement Pool', description: 'Safely reserves client disbursements with zero latency', enabled: true, status: 'Active' },
-    { id: 'pool-3', name: 'Standard Retail Float', description: 'Regular P2P automated queue limits', enabled: true, status: 'Active' }
-  ]);
+  const [pools, setPools] = useState<any[]>(() => {
+    const saved = localStorage.getItem('finlux_pm_pools');
+    if (saved) {
+      try { return JSON.parse(saved); } catch(e) {}
+    }
+    return [
+      { id: 'pool-1', name: 'High-Priority Ingress Pool', description: 'Primary high-speed pool for active deposits', enabled: true, status: 'Active' },
+      { id: 'pool-2', name: 'VIP Settlement Pool', description: 'Safely reserves client disbursements with zero latency', enabled: true, status: 'Active' },
+      { id: 'pool-3', name: 'Standard Retail Float', description: 'Regular P2P automated queue limits', enabled: true, status: 'Active' }
+    ];
+  });
 
   // MENA Region Payment Methods
-  const [methods, setMethods] = useState([
-    { id: 'method-1', name: 'Vodafone Cash', region: 'Egypt (EG)', logoEmoji: '📱', type: 'Pay-In', enabled: true, logoUrl: '' },
-    { id: 'method-2', name: 'InstaPay Egypt', region: 'Egypt (EG)', logoEmoji: '🏦', type: 'Pay-In', enabled: true, logoUrl: '' },
-    { id: 'method-3', name: 'STC Pay', region: 'Saudi Arabia (KSA)', logoEmoji: '🪙', type: 'Pay-In', enabled: true, logoUrl: '' },
-    { id: 'method-4', name: 'Fawry Pay', region: 'Egypt (EG)', logoEmoji: '⚡', type: 'Pay-In', enabled: true, logoUrl: '' },
-    { id: 'method-5', name: 'BenefitPay', region: 'Bahrain (BH)', logoEmoji: '🇧🇭', type: 'Pay-Out', enabled: true, logoUrl: '' },
-    { id: 'method-6', name: 'KNET Gateway', region: 'Kuwait (KW)', logoEmoji: '🇰🇼', type: 'Pay-Out', enabled: true, logoUrl: '' }
-  ]);
+  const [methods, setMethods] = useState<any[]>(() => {
+    const saved = localStorage.getItem('finlux_pm_methods');
+    const baseMethods = [
+      { id: 'method-1', name: 'Vodafone Cash', region: 'Egypt (EG)', logoEmoji: '📱', type: 'Pay-In', enabled: true, logoUrl: '' },
+      { id: 'method-2', name: 'InstaPay Egypt', region: 'Egypt (EG)', logoEmoji: '🏦', type: 'Pay-In', enabled: true, logoUrl: '' },
+      { id: 'method-3', name: 'STC Pay', region: 'Saudi Arabia (KSA)', logoEmoji: '🪙', type: 'Pay-In', enabled: true, logoUrl: '' },
+      { id: 'method-4', name: 'Fawry Pay', region: 'Egypt (EG)', logoEmoji: '⚡', type: 'Pay-In', enabled: true, logoUrl: '' },
+      { id: 'method-5', name: 'BenefitPay', region: 'Bahrain (BH)', logoEmoji: '🇧🇭', type: 'Pay-Out', enabled: true, logoUrl: '' },
+      { id: 'method-6', name: 'KNET Gateway', region: 'Kuwait (KW)', logoEmoji: '🇰🇼', type: 'Pay-Out', enabled: true, logoUrl: '' },
+      { id: 'method-local-depositor', name: 'Local Depositor', region: 'Egypt (EG)', logoEmoji: '👥', type: 'Pay-In', enabled: true, logoUrl: '' }
+    ];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (!parsed.some((m: any) => m.id === 'method-local-depositor')) {
+          parsed.push({ id: 'method-local-depositor', name: 'Local Depositor', region: 'Egypt (EG)', logoEmoji: '👥', type: 'Pay-In', enabled: true, logoUrl: '' });
+        }
+        return parsed;
+      } catch (e) {}
+    }
+    return baseMethods;
+  });
 
   // Accounts linked to methods & pools
-  const [accounts, setAccounts] = useState([
-    { id: 'acc-1', methodId: 'method-1', label: 'Vodafone Cash Primary #7742', identifier: '01023456789', pool: 'High-Priority Ingress Pool', used: 24500, limit: 30000, status: 'Active' },
-    { id: 'acc-2', methodId: 'method-1', label: 'V-wallet backup', identifier: '01053429988', pool: 'Standard Retail Float', used: 2000, limit: 30000, status: 'Active' },
-    { id: 'acc-3', methodId: 'method-2', label: 'CIB corporate instapay', identifier: 'cib_instapay_99@cib', pool: 'VIP Settlement Pool', used: 120000, limit: 250000, status: 'Active' },
-    { id: 'acc-4', methodId: 'method-3', label: 'STC Admin pay-out area', identifier: '+966509998811', pool: 'VIP Settlement Pool', used: 45000, limit: 250000, status: 'Active' }
-  ]);
+  const [accounts, setAccounts] = useState<any[]>(() => {
+    const saved = localStorage.getItem('finlux_pm_accounts');
+    const baseAccounts = [
+      { id: 'acc-1', methodId: 'method-1', label: 'Vodafone Cash Primary #7742', identifier: '01023456789', pool: 'High-Priority Ingress Pool', used: 24500, limit: 30000, status: 'Active', logoUrl: '' },
+      { id: 'acc-2', methodId: 'method-1', label: 'V-wallet backup', identifier: '01053429988', pool: 'Standard Retail Float', used: 2000, limit: 30000, status: 'Active', logoUrl: '' },
+      { id: 'acc-3', methodId: 'method-2', label: 'CIB corporate instapay', identifier: 'cib_instapay_99@cib', pool: 'VIP Settlement Pool', used: 120000, limit: 250000, status: 'Active', logoUrl: '' },
+      { id: 'acc-4', methodId: 'method-3', label: 'STC Admin pay-out area', identifier: '+966509998811', pool: 'VIP Settlement Pool', used: 45000, limit: 250000, status: 'Active', logoUrl: '' },
+      { id: 'acc-ld-1', methodId: 'method-local-depositor', label: 'Khalid Ahmed (Local Depositor)', identifier: 'LD-882193', pool: 'High-Priority Ingress Pool', used: 12450, limit: 15000, status: 'Active', logoUrl: '' },
+      { id: 'acc-ld-2', methodId: 'method-local-depositor', label: 'Yasmine Mansour (Local Depositor)', identifier: 'LD-884022', pool: 'Standard Retail Float', used: 2100, limit: 25000, status: 'Active', logoUrl: '' },
+      { id: 'acc-ld-3', methodId: 'method-local-depositor', label: 'Omar Mahmoud (Local Depositor)', identifier: 'LD-911245', pool: 'VIP Settlement Pool', used: 8900, limit: 10000, status: 'Active', logoUrl: '' }
+    ];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (!parsed.some((a: any) => a.id === 'acc-ld-1')) {
+          parsed.push({ id: 'acc-ld-1', methodId: 'method-local-depositor', label: 'Khalid Ahmed (Local Depositor)', identifier: 'LD-882193', pool: 'High-Priority Ingress Pool', used: 12450, limit: 15000, status: 'Active', logoUrl: '' });
+        }
+        if (!parsed.some((a: any) => a.id === 'acc-ld-2')) {
+          parsed.push({ id: 'acc-ld-2', methodId: 'method-local-depositor', label: 'Yasmine Mansour (Local Depositor)', identifier: 'LD-884022', pool: 'Standard Retail Float', used: 2100, limit: 25000, status: 'Active', logoUrl: '' });
+        }
+        if (!parsed.some((a: any) => a.id === 'acc-ld-3')) {
+          parsed.push({ id: 'acc-ld-3', methodId: 'method-local-depositor', label: 'Omar Mahmoud (Local Depositor)', identifier: 'LD-911245', pool: 'VIP Settlement Pool', used: 8900, limit: 10000, status: 'Active', logoUrl: '' });
+        }
+        return parsed;
+      } catch (e) {}
+    }
+    return baseAccounts;
+  });
 
   // Merchant pool custom fee config
-  const [merchantConfigs, setMerchantConfigs] = useState([
-    { id: 'fee-1', merchantName: 'Luxury Goods Co.', methodId: 'method-1', poolId: 'pool-1', feePercent: 1.2, feeFixed: 3.0, direction: 'Pay-In' },
-    { id: 'fee-2', merchantName: 'Luxury Goods Co.', methodId: 'method-2', poolId: 'pool-2', feePercent: 0.8, feeFixed: 5.0, direction: 'Pay-In' },
-    { id: 'fee-3', merchantName: 'Apex Global Ltd', methodId: 'method-3', poolId: 'pool-2', feePercent: 1.5, feeFixed: 2.0, direction: 'Pay-Out' },
-    { id: 'fee-4', merchantName: 'Swift Tech', methodId: 'method-4', poolId: 'pool-3', feePercent: 2.0, feeFixed: 1.5, direction: 'Pay-In' }
-  ]);
+  const [merchantConfigs, setMerchantConfigs ] = useState<any[]>(() => {
+    const saved = localStorage.getItem('finlux_pm_merchantConfigs');
+    if (saved) {
+      try { return JSON.parse(saved); } catch(e) {}
+    }
+    return [
+      { id: 'fee-1', merchantName: 'Luxury Goods Co.', methodId: 'method-1', poolId: 'pool-1', feePercent: 1.2, feeFixed: 3.0, direction: 'Pay-In' },
+      { id: 'fee-2', merchantName: 'Luxury Goods Co.', methodId: 'method-2', poolId: 'pool-2', feePercent: 0.8, feeFixed: 5.0, direction: 'Pay-In' },
+      { id: 'fee-3', merchantName: 'Apex Global Ltd', methodId: 'method-3', poolId: 'pool-2', feePercent: 1.5, feeFixed: 2.0, direction: 'Pay-Out' },
+      { id: 'fee-4', merchantName: 'Swift Tech', methodId: 'method-4', poolId: 'pool-3', feePercent: 2.0, feeFixed: 1.5, direction: 'Pay-In' }
+    ];
+  });
+
+  // Keep synced
+  useEffect(() => {
+    localStorage.setItem('finlux_pm_pools', JSON.stringify(pools));
+  }, [pools]);
+
+  useEffect(() => {
+    localStorage.setItem('finlux_pm_methods', JSON.stringify(methods));
+  }, [methods]);
+
+  useEffect(() => {
+    localStorage.setItem('finlux_pm_accounts', JSON.stringify(accounts));
+  }, [accounts]);
+
+  useEffect(() => {
+    localStorage.setItem('finlux_pm_merchantConfigs', JSON.stringify(merchantConfigs));
+  }, [merchantConfigs]);
+
+  // Account specific high-fidelity payments and transaction ledger storage
+  const [accountTransactions, setAccountTransactions] = useState<any[]>(() => {
+    const saved = localStorage.getItem('finlux_account_transactions');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [
+      // Khalid Ahmed (LD-882193) base transactions under method Local Depositor
+      {
+        id: 'TXN-LD-101',
+        accountId: 'acc-ld-1',
+        type: 'Deposit',
+        amount: 5400,
+        status: 'Approved',
+        photo: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350',
+        timestamp: '2026-06-12 10:15',
+        declineReason: ''
+      },
+      {
+        id: 'TXN-LD-102',
+        accountId: 'acc-ld-1',
+        type: 'Payout',
+        amount: 2500,
+        status: 'In Progress',
+        photo: '',
+        timestamp: '2026-06-12 11:30',
+        declineReason: ''
+      },
+      {
+        id: 'TXN-LD-103',
+        accountId: 'acc-ld-1',
+        type: 'Deposit',
+        amount: 8000,
+        status: 'Declined',
+        photo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=350',
+        timestamp: '2026-06-12 12:05',
+        declineReason: 'Insufficient Funds'
+      },
+      // Yasmine Mansour (LD-884022) transactions
+      {
+        id: 'TXN-LD-201',
+        accountId: 'acc-ld-2',
+        type: 'Deposit',
+        amount: 15400,
+        status: 'In Progress',
+        photo: '',
+        timestamp: '2026-06-12 09:20',
+        declineReason: ''
+      },
+      {
+        id: 'TXN-LD-202',
+        accountId: 'acc-ld-2',
+        type: 'Payout',
+        amount: 5000,
+        status: 'Declined',
+        photo: '',
+        timestamp: '2026-06-12 11:10',
+        declineReason: 'Invalid Recipient Details'
+      },
+      // Omar Mahmoud (LD-911245) transactions
+      {
+        id: 'TXN-LD-301',
+        accountId: 'acc-ld-3',
+        type: 'Deposit',
+        amount: 12000,
+        status: 'Approved',
+        photo: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=350',
+        timestamp: '2026-06-12 08:30',
+        declineReason: ''
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('finlux_account_transactions', JSON.stringify(accountTransactions));
+  }, [accountTransactions]);
+
+  // Account Ledger Modal Control States
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [selectedLedgerAccount, setSelectedLedgerAccount] = useState<any>(null);
+
+  // New Transaction Creation form states
+  const [newTxType, setNewTxType] = useState<'Deposit' | 'Payout'>('Deposit');
+  const [newTxAmount, setNewTxAmount] = useState('');
+  const [newTxStatus, setNewTxStatus] = useState<'Pending' | 'In Progress' | 'Approved' | 'Declined'>('Pending');
+  const [newTxDeclineReason, setNewTxDeclineReason] = useState('Insufficient Funds');
+  const [newTxPhoto, setNewTxPhoto] = useState('');
+  const [lightboxPhoto, setLightboxPhoto] = useState('');
+
+  // Decline Reasons databases as requested
+  const depositDeclineReasons = [
+    'Insufficient Funds',
+    'Invalid Payment Method',
+    'Suspected Fraud',
+    'Compliance Issue',
+    'Technical Error',
+    'Account Closed or Frozen',
+    'Payment Method Expired'
+  ];
+
+  const payoutDeclineReasons = [
+    'Invalid Recipient Details',
+    'Insufficient Balance',
+    'Compliance Violation',
+    'Suspicious Activity',
+    'Account Not Verified',
+    'Transaction Limit Exceeded',
+    'System Error',
+    'Bank Rejection'
+  ];
 
   // Available MENA countries list
   const menaCountries = [
@@ -463,14 +639,36 @@ export default function PaymentMethods() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 mb-4">
+                   <div className="flex items-center gap-4 mb-4">
                     {/* Custom Logo Display (Real uploaded image vs default fallback) */}
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow border border-outline-variant/30 overflow-hidden bg-background">
-                      {method.logoUrl ? (
-                        <img src={method.logoUrl} alt={method.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span>{method.logoEmoji}</span>
-                      )}
+                    <div className="relative group/logo w-12 h-12">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow border border-outline-variant/30 overflow-hidden bg-background">
+                        {method.logoUrl ? (
+                          <img src={method.logoUrl} alt={method.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{method.logoEmoji}</span>
+                        )}
+                      </div>
+                      <label className="absolute -bottom-1 -right-1 bg-white border border-outline shadow p-1 rounded-md cursor-pointer hover:bg-slate-50 transition-colors shadow-2xs">
+                        <Upload className="w-2.5 h-2.5 text-on-surface-variant" />
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const base64 = reader.result as string;
+                                setMethods(prev => prev.map(m => m.id === method.id ? { ...m, logoUrl: base64 } : m));
+                                alert(t("Method logo updated successfully!"));
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          className="hidden" 
+                        />
+                      </label>
                     </div>
                     <div>
                       <h4 className="font-bold text-on-surface text-base">{method.name}</h4>
@@ -749,8 +947,44 @@ export default function PaymentMethods() {
                       <tr key={acc.id} className="hover:bg-surface-container-low/20 transition-all font-semibold">
                         {/* Account details */}
                         <td className="px-6 py-4.5">
-                          <p className="font-bold text-on-surface text-xs">{acc.label}</p>
-                          <p className="text-primary font-mono text-[11px] mt-0.5">{acc.identifier}</p>
+                          <div className="flex items-center gap-3">
+                            <div className="relative group/acc">
+                              <div className="w-10 h-10 rounded-xl bg-slate-100 border border-outline-variant/60 flex items-center justify-center text-xs font-bold overflow-hidden shadow-sm">
+                                {acc.logoUrl ? (
+                                  <img src={acc.logoUrl} alt="account logo" className="w-full h-full object-cover" />
+                                ) : (
+                                  <span>{acc.label?.[0] || 'A'}</span>
+                                )}
+                              </div>
+                              <label className="absolute -bottom-1 -right-1 bg-white border border-outline-variant rounded p-0.5 cursor-pointer hover:bg-slate-50 transition-colors shadow-2xs">
+                                <Upload className="w-2.5 h-2.5 text-on-surface-variant" />
+                                <input 
+                                  type="file" 
+                                  accept="image/*" 
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onload = () => {
+                                        const base64 = reader.result as string;
+                                        setAccounts(prev => prev.map(item => 
+                                          item.id === acc.id ? { ...item, logoUrl: base64 } : item
+                                        ));
+                                        alert(t("Account brand logo uploaded successfully!"));
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }} 
+                                  className="hidden" 
+                                />
+                              </label>
+                            </div>
+
+                            <div>
+                              <p className="font-bold text-on-surface text-xs">{acc.label}</p>
+                              <p className="text-primary font-mono text-[11px] mt-0.5">{acc.identifier}</p>
+                            </div>
+                          </div>
                         </td>
 
                         {/* Integration Channel */}
@@ -796,16 +1030,30 @@ export default function PaymentMethods() {
                         </td>
 
                         {/* Actions */}
-                        <td className="px-6 py-4.5 text-right space-x-2 rtl:space-x-reverse">
+                        <td className="px-6 py-4.5 text-right space-x-2 rtl:space-x-reverse whitespace-nowrap">
+                          <button 
+                            onClick={() => {
+                              setSelectedLedgerAccount(acc);
+                              setNewTxType('Deposit');
+                              setNewTxAmount('');
+                              setNewTxStatus('Pending');
+                              setNewTxDeclineReason('Insufficient Funds');
+                              setNewTxPhoto('');
+                              setShowLedgerModal(true);
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] bg-[#0f172a] text-[#f8fafc] hover:bg-slate-800 px-2.5 py-1.5 rounded-lg transition-all font-bold uppercase tracking-wider shadow-xs"
+                          >
+                            <span>📂 {t("Ledger & TXNs")}</span>
+                          </button>
                           <button 
                             onClick={() => startEditAccount(acc)}
-                            className="text-[11px] text-primary hover:bg-primary/10 border border-primary/20 px-2.5 py-1.5 rounded-lg transition-colors font-bold uppercase tracking-wider"
+                            className="inline-flex items-center text-[11px] text-primary hover:bg-primary/10 border border-primary/20 px-2.5 py-1.5 rounded-lg transition-colors font-bold uppercase tracking-wider"
                           >
                             {t("Edit")}
                           </button>
                           <button 
                             onClick={() => deleteAccount(acc.id)}
-                            className="text-[11px] text-rose-500 hover:bg-rose-50 border border-rose-200 px-2.5 py-1.5 rounded-lg transition-colors font-bold uppercase tracking-wider"
+                            className="inline-flex items-center text-[11px] text-rose-500 hover:bg-rose-50 border border-rose-200 px-2.5 py-1.5 rounded-lg transition-colors font-bold uppercase tracking-wider"
                           >
                             {t("Delete")}
                           </button>
@@ -1502,6 +1750,382 @@ export default function PaymentMethods() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* 7. High-Fidelity Account Ledger & Transactions Studio Modal */}
+      <AnimatePresence>
+        {showLedgerModal && selectedLedgerAccount && (
+          <div className="fixed inset-0 z-50 bg-[#0c0c1b]/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[32px] max-w-5xl w-full p-8 border border-outline-variant text-left ltr:text-left rtl:text-right shadow-2xl relative my-8"
+            >
+              {/* Close Button */}
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowLedgerModal(false);
+                  setSelectedLedgerAccount(null);
+                  setNewTxPhoto('');
+                }} 
+                className="absolute top-6 right-6 text-on-surface-variant hover:text-on-surface text-lg font-bold bg-slate-100 hover:bg-slate-200 p-2 rounded-full w-8 h-8 flex items-center justify-center transition-colors shadow-2xs"
+              >
+                ✕
+              </button>
+
+              <div className="mb-6">
+                <span className="px-3.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-[10px] font-black uppercase tracking-wider text-primary">
+                  {t("Ledger & P2P Settlements Room")}
+                </span>
+                <h3 className="text-2xl font-black text-on-surface mt-2 flex items-center gap-2">
+                  <span>📂 {selectedLedgerAccount.label}</span>
+                  <span className="text-xs font-mono bg-slate-100 px-2.5 py-1 rounded-md text-slate-600">ID: {selectedLedgerAccount.identifier}</span>
+                </h3>
+                <p className="text-xs text-on-surface-variant mt-1.5 flex items-center gap-1.5">
+                  <span className="font-bold">{t("Connected Method")}:</span> 
+                  <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-800 font-extrabold text-[11px]">{methods.find((m: any) => m.id === selectedLedgerAccount.methodId)?.name || 'Local Depositor'}</span>
+                  <span className="text-slate-300">•</span>
+                  <span className="font-bold">{t("Assigned Pool")}:</span> 
+                  <span className="text-primary font-bold">{selectedLedgerAccount.pool || t("Unassigned")}</span>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Left Side: Create Transaction Form */}
+                <div className="lg:col-span-5 bg-slate-50/70 border border-slate-200/60 p-6 rounded-[24px] space-y-4">
+                  <h4 className="font-bold text-sm text-[#0c0c1b] tracking-tight border-b pb-2 flex items-center gap-2">
+                    <span>⚡ {t("Trigger New Settlement TXN")}</span>
+                  </h4>
+
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newTxAmount || isNaN(Number(newTxAmount)) || Number(newTxAmount) <= 0) {
+                        alert(t("Please specify a valid EGP amount bounds."));
+                        return;
+                      }
+                      const newTx = {
+                        id: 'TXN-LD-' + Math.floor(Math.random() * 900000 + 100000),
+                        accountId: selectedLedgerAccount.id,
+                        type: newTxType,
+                        amount: Number(newTxAmount),
+                        status: newTxStatus,
+                        photo: newTxPhoto,
+                        timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
+                        declineReason: newTxStatus === 'Declined' ? newTxDeclineReason : ''
+                      };
+                      setAccountTransactions(prev => [newTx, ...prev]);
+                      setNewTxAmount('');
+                      setNewTxPhoto('');
+                      alert(t("Settlement ledger transaction successfully authorized!"));
+                    }} 
+                    className="space-y-4 text-xs font-semibold"
+                  >
+                    {/* Type Choice */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                        {t("Transaction Type")}
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewTxType('Deposit');
+                            setNewTxDeclineReason(depositDeclineReasons[0]);
+                          }}
+                          className={`py-2 px-3 rounded-xl font-bold border transition-all text-center ${newTxType === 'Deposit' ? 'bg-primary border-primary text-white' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          📥 {t("Deposit (Pay-In)")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewTxType('Payout');
+                            setNewTxDeclineReason(payoutDeclineReasons[0]);
+                          }}
+                          className={`py-2 px-3 rounded-xl font-bold border transition-all text-center ${newTxType === 'Payout' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          📤 {t("Payout (Pay-Out)")}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Amount */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                        {t("Amount (EGP)")}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-extrabold text-slate-400">EGP</span>
+                        <input
+                          type="number"
+                          value={newTxAmount}
+                          onChange={(e) => setNewTxAmount(e.target.value)}
+                          placeholder="e.g. 15000"
+                          className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary rounded-xl font-bold placeholder-slate-300 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Status selection */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                        {t("Execution Status")}
+                      </label>
+                      <select
+                        value={newTxStatus}
+                        onChange={(e: any) => setNewTxStatus(e.target.value)}
+                        className="w-full p-2.5 bg-white border border-slate-200 focus:border-primary rounded-xl font-bold outline-none text-xs"
+                      >
+                        <option value="Pending">{t("Pending")}</option>
+                        <option value="In Progress">{t("In Progress")}</option>
+                        <option value="Approved">{t("Approved")}</option>
+                        <option value="Declined">{t("Declined")}</option>
+                      </select>
+                    </div>
+
+                    {/* Conditional Decline Reason based on selected status */}
+                    <AnimatePresence mode="wait">
+                      {newTxStatus === 'Declined' && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -5 }}
+                          className="space-y-1"
+                        >
+                          <label className="block text-[10px] font-bold text-[#ba1a1a] uppercase tracking-wider">
+                            🚨 {t("Decline Failure Reason")}
+                          </label>
+                          <select
+                            value={newTxDeclineReason}
+                            onChange={(e) => setNewTxDeclineReason(e.target.value)}
+                            className="w-full p-2.5 bg-white border border-[#ba1a1a]/40 focus:border-[#ba1a1a] focus:ring-1 focus:ring-[#ba1a1a] text-[#93000a] rounded-xl font-bold outline-none text-xs"
+                          >
+                            {newTxType === 'Deposit' 
+                              ? depositDeclineReasons.map(r => <option key={r} value={r}>{r}</option>)
+                              : payoutDeclineReasons.map(r => <option key={r} value={r}>{r}</option>)
+                            }
+                          </select>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Receipt image upload */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">
+                        📷 {t("Upload Proof Photo (Receipt)")}
+                      </label>
+                      
+                      {!newTxPhoto ? (
+                        <div className="border border-dashed border-slate-300 hover:border-primary rounded-xl p-4 text-center cursor-pointer bg-white transition-all hover:bg-slate-50 relative">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  setNewTxPhoto(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                          <Upload className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
+                          <p className="text-[10px] font-bold text-slate-500">{t("Click or Drop receipt image proof")}</p>
+                          <p className="text-[9px] text-[#006c49]/80 font-semibold mt-0.5">{t("Highly recommended for rapid compliance loops")}</p>
+                        </div>
+                      ) : (
+                        <div className="border border-slate-200 bg-white p-3 rounded-xl space-y-2 relative">
+                          <p className="text-[10px] text-[#006c49] font-bold flex items-center gap-1">
+                            <span>✓</span> {t("Receipt upload active")}
+                          </p>
+                          <div className="relative aspect-video w-full max-h-36 rounded-lg bg-slate-50 border overflow-hidden">
+                            <img src={newTxPhoto} alt="Uploaded Proof Photo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <button
+                              type="button"
+                              onClick={() => setNewTxPhoto('')}
+                              className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full text-[10px] hover:bg-red-700 font-bold transition-all w-5 h-5 flex items-center justify-center shrink-0"
+                              title="Delete Photo"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3 bg-[#0d593a] hover:bg-[#003823] text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-colors shadow-md mt-4"
+                    >
+                      {t("Verify & Commit Transaction")}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Right Side: Ledger Table */}
+                <div className="lg:col-span-7 flex flex-col justify-between space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between border-b pb-2 mb-3">
+                      <h4 className="font-extrabold text-sm text-[#0c0c1b] tracking-tight">
+                        📋 {t("Operational Settled Settlement Ledger")}
+                      </h4>
+                      <span className="text-[10px] uppercase font-bold text-slate-400">
+                        {accountTransactions.filter((tx: any) => tx.accountId === selectedLedgerAccount.id).length} {t("Records Listed")}
+                      </span>
+                    </div>
+
+                    {/* Interactive table */}
+                    <div className="overflow-x-auto border border-slate-100 rounded-2xl bg-white max-h-[380px] overflow-y-auto">
+                      <table className="w-full text-left ltr:text-left rtl:text-right border-collapse text-xs">
+                        <thead className="bg-slate-50 text-slate-500 font-black uppercase text-[9px] tracking-wider border-b sticky top-0 z-10">
+                          <tr>
+                            <th className="p-3 pl-4">{t("TXN ID")}</th>
+                            <th className="p-3">{t("Type")}</th>
+                            <th className="p-3">{t("Amount")}</th>
+                            <th className="p-3">{t("Status & Failure Remarks")}</th>
+                            <th className="p-3">{t("Date")}</th>
+                            <th className="p-3 text-right pr-4">{t("Proof Photo")}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
+                          {accountTransactions.filter((tx: any) => tx.accountId === selectedLedgerAccount.id).length > 0 ? (
+                            accountTransactions.filter((tx: any) => tx.accountId === selectedLedgerAccount.id).map((tx: any) => (
+                              <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="p-3 pl-4 font-mono text-[10px] text-slate-800 font-extrabold">{tx.id}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase ${tx.type === 'Deposit' ? 'bg-[#e2f1e8] text-[#07532f]' : 'bg-[#e8eaf6] text-[#283593]'}`}>
+                                    {tx.type}
+                                  </span>
+                                </td>
+                                <td className="p-3 font-mono text-primary font-black text-sm">{tx.amount.toLocaleString()} <span className="text-[10px] text-slate-400 font-bold">EGP</span></td>
+                                <td className="p-3">
+                                  <div className="space-y-1">
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                                      tx.status === 'Approved' ? 'bg-[#cbf2e2] text-[#003823]' :
+                                      tx.status === 'Pending' ? 'bg-[#ffebd1] text-[#7a4b00]' :
+                                      tx.status === 'In Progress' ? 'bg-[#dfe3ff] text-[#001452]' :
+                                      'bg-[#ffdad6] text-[#ba1a1a]'
+                                    }`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${
+                                        tx.status === 'Approved' ? 'bg-secondary animate-pulse' :
+                                        tx.status === 'Pending' ? 'bg-orange-500' :
+                                        tx.status === 'In Progress' ? 'bg-blue-600 animate-bounce' :
+                                        'bg-red-600'
+                                      }`} />
+                                      {tx.status}
+                                    </span>
+                                    {tx.status === 'Declined' && (
+                                      <p className="text-[10px] text-red-600 font-bold italic block break-words max-w-[150px]">{t("Reason")}: {tx.declineReason}</p>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-3 text-[10px] font-semibold text-slate-400 font-mono whitespace-nowrap">{tx.timestamp}</td>
+                                <td className="p-3 text-right pr-4">
+                                  {tx.photo ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setLightboxPhoto(tx.photo)}
+                                      className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline bg-primary/5 hover:bg-primary/10 px-2 py-1 rounded transition-colors border border-primary/10"
+                                    >
+                                      <img src={tx.photo} alt="mini" className="w-5 h-5 object-cover rounded shadow-xs border inline-block" referrerPolicy="no-referrer" />
+                                      <span>{t("Receipt")}</span>
+                                    </button>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 italic font-medium">{t("No upload")}</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={6} className="py-12 text-center text-slate-400 font-medium">
+                                <span className="block text-2xl mb-1">📭</span>
+                                {t("No transaction history recorded for this account block.")}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Operational Status Guidelines presentation */}
+                  <div className="bg-slate-50 border border-slate-200/50 p-4 rounded-2xl text-[10px] font-semibold text-slate-500 space-y-1.5 leading-relaxed">
+                    <p className="font-extrabold uppercase text-[9px] text-[#0c0c1b] tracking-wider mb-1 flex items-center gap-1.5">
+                      <span>📖</span> {t("Compliance & Audit Status Playbook Guidelines")}
+                    </p>
+                    <div className="grid grid-cols-2 gap-4 text-[9px]">
+                      <div>
+                        <strong className="text-slate-700">{t("Deposit Transaction Guidelines:")}</strong>
+                        <ul className="list-disc leading-tight pl-3 mt-1 space-y-1">
+                          <li><strong>Pending:</strong> Submitted, awaiting agent verification.</li>
+                          <li><strong>In Progress:</strong> Processing actively by payment gateway.</li>
+                          <li><strong>Approved:</strong> Cleared and credited safely.</li>
+                          <li><strong>Declined:</strong> Rejected with decline remark listed on row bounds.</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <strong className="text-slate-700">{t("Payout Transaction Guidelines:")}</strong>
+                        <ul className="list-disc leading-tight pl-3 mt-1 space-y-1">
+                          <li><strong>Pending:</strong> Requested, awaiting compliance release key.</li>
+                          <li><strong>In Progress:</strong> Money clearing with local banking network.</li>
+                          <li><strong>Approved:</strong> Funds successfully disbursed, proof file attached.</li>
+                          <li><strong>Declined:</strong> Reclaimed or blocked by recipient institution.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 8. Lightbox full image previewer */}
+      {lightboxPhoto && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-4 cursor-pointer" 
+          onClick={() => setLightboxPhoto('')}
+        >
+          <div 
+            className="relative max-w-2xl w-full flex flex-col items-center" 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="absolute -top-12 right-0 flex items-center gap-2">
+              <button 
+                onClick={() => setLightboxPhoto('')}
+                className="bg-white/10 hover:bg-white/20 text-white rounded-full p-2 text-xs font-bold w-10 h-10 flex items-center justify-center transition-all shadow-xs"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-slate-900 border border-white/10 p-3 rounded-2xl shadow-2xl relative w-full flex flex-col items-center"
+            >
+              <img 
+                src={lightboxPhoto} 
+                alt={t("Audit High-Fidelity Receipt Proof")} 
+                className="max-w-full max-h-[60vh] object-contain rounded-xl shadow border border-white/5" 
+                referrerPolicy="no-referrer"
+              />
+              <div className="w-full mt-3 flex justify-between items-center text-xs text-white/60 font-semibold px-2">
+                <span>🛡️ {t("Secure Ledger Audit Cryptographic Proof Asset")}</span>
+                <span className="text-[10px] text-slate-400">Click anywhere outside to close</span>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      )}
 
     </motion.div>
   );

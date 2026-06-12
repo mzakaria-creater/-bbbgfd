@@ -14,7 +14,8 @@ import {
   Smartphone,
   Shield,
   Layers,
-  Sparkles
+  Sparkles,
+  Upload
 } from 'lucide-react';
 
 export default function LocalDepositors() {
@@ -24,14 +25,30 @@ export default function LocalDepositors() {
     id: 'LD-882193',
     tier: 'Platinum Tier Depositor',
     limit: 15000,
-    methods: { label: 'Vodafone Cash & InstaPay', vodafone: true, bank: false }
+    methods: { label: 'Vodafone Cash & InstaPay', vodafone: true, bank: false },
+    img: ''
   });
 
-  const [agentsList, setAgentsList] = useState([
-    { name: 'Khalid Ahmed', initials: 'KA', id: 'LD-882193', tier: 'Platinum Tier Depositor', limitUsed: 12450, totalLimit: 15000, methods: ['Vodafone Cash', 'InstaPay'], commission: '2.1%', methodType: 'Hybrid Scale', status: 'Active' },
-    { name: 'Yasmine Mansour', initials: 'YM', id: 'LD-884022', img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDJs128zzwXaookRHXqOhFskrhrVW-T2x_Py8uV63gnEafxnPLunhgG5ydr7I_BEqRRifrdjCnvFlk01gx4g_gkEZ2bhjkY1u1yF9eQ_fA3KUL3n3ZWv-UG1OlpdjyeoTSucQIkesFJV5gUOfmjpCAeMPyc2o6SkngDkA0YFciJF6Bnr6i1eG28XHGT9CqJGZVZRRjra6IM_ofzVpkEZ-Iiceyn1UzRqzWTDSlQ6rnBo8gFxiZ8GUQZXRPb9oQC9-eYnyRlCNGNoR0', limitUsed: 2100, totalLimit: 25000, methods: ['Orange Money', 'Bank Transfer'], commission: '1.5%', methodType: 'Global Base', status: 'Restricted' },
-    { name: 'Omar Mahmoud', initials: 'OM', id: 'LD-911245', limitUsed: 8900, totalLimit: 10000, methods: ['InstaPay'], commission: '1.8%', methodType: 'Performance Plus', status: 'Active' }
-  ]);
+  const [agentsList, setAgentsList] = useState<any[]>(() => {
+    const saved = localStorage.getItem('finlux_agents');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    const defaults = [
+      { name: 'Khalid Ahmed', initials: 'KA', id: 'LD-882193', tier: 'Platinum Tier Depositor', limitUsed: 12450, totalLimit: 15000, methods: ['Vodafone Cash', 'InstaPay'], commission: '2.1%', methodType: 'Hybrid Scale', status: 'Active', img: '' },
+      { name: 'Yasmine Mansour', initials: 'YM', id: 'LD-884022', img: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150', limitUsed: 2100, totalLimit: 25000, methods: ['Orange Money', 'Bank Transfer'], commission: '1.5%', methodType: 'Global Base', status: 'Restricted' },
+      { name: 'Omar Mahmoud', initials: 'OM', id: 'LD-911245', limitUsed: 8900, totalLimit: 10000, methods: ['InstaPay'], commission: '1.8%', methodType: 'Performance Plus', status: 'Active', img: '' }
+    ];
+    localStorage.setItem('finlux_agents', JSON.stringify(defaults));
+    return defaults;
+  });
+
+  const saveAgentsState = (newVal: any[]) => {
+    setAgentsList(newVal);
+    localStorage.setItem('finlux_agents', JSON.stringify(newVal));
+  };
 
   const togglePanel = (agent: any) => {
     setSelectedAgent(agent);
@@ -39,11 +56,37 @@ export default function LocalDepositors() {
   };
 
   const saveEditedAgent = () => {
-    setAgentsList(prev => 
-      prev.map(item => item.id === selectedAgent.id ? { ...item, totalLimit: selectedAgent.limit } : item)
+    const updated = agentsList.map(item => 
+      item.id === selectedAgent.id ? { 
+        ...item, 
+        totalLimit: selectedAgent.limit || item.totalLimit,
+        img: selectedAgent.img || item.img 
+      } : item
     );
+    saveAgentsState(updated);
     setShowConfigpanel(false);
     alert(`Successfully committed daily transaction bounds for agent: ${selectedAgent.name}`);
+  };
+
+  const handleAgentPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        setSelectedAgent(prev => ({
+          ...prev,
+          img: base64
+        }));
+        // instantly sync back to agentsList in state so preview is live
+        const updated = agentsList.map(item => 
+          item.id === selectedAgent.id ? { ...item, img: base64 } : item
+        );
+        saveAgentsState(updated);
+        alert("Agent profile photo uploaded successfully!");
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -245,13 +288,31 @@ export default function LocalDepositors() {
                 </div>
 
                 {/* Profile card preview inside slideout */}
-                <div className="bg-surface-container-low p-4 rounded-xl flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-xl">
-                    {selectedAgent.initials || 'KA'}
+                <div className="bg-surface-container-low p-4 rounded-xl flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-xl overflow-hidden border border-outline-variant">
+                      {selectedAgent.img ? (
+                        <img src={selectedAgent.img} alt={selectedAgent.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{selectedAgent.initials || 'KA'}</span>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-on-surface text-sm">{selectedAgent.name}</h4>
+                      <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-extrabold">{selectedAgent.tier || 'Platinum Agent'}</p>
+                    </div>
                   </div>
+
                   <div>
-                    <h4 className="font-bold text-on-surface">{selectedAgent.name}</h4>
-                    <p className="text-[11px] text-on-surface-variant uppercase tracking-widest font-extrabold">{selectedAgent.tier || 'Platinum Agent'}</p>
+                    <label className="p-2 bg-white border border-outline hover:bg-slate-50 rounded-xl cursor-pointer text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs">
+                      <Upload className="w-3.5 h-3.5" />
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleAgentPhotoUpload}
+                        className="hidden" 
+                      />
+                    </label>
                   </div>
                 </div>
 
