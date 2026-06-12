@@ -20,7 +20,8 @@ import {
   Menu,
   X,
   Smartphone,
-  Sliders
+  Sliders,
+  MessageSquareText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LanguageProvider, useTranslation } from './context/LanguageContext';
@@ -39,6 +40,7 @@ import Commissions from './components/Commissions';
 import MerchantPortal from './components/MerchantPortal';
 import WalletAllocationEngine from './components/WalletAllocationEngine';
 import WalletDashboard from './components/WalletDashboard';
+import OrangeSmsReader from './components/OrangeSmsReader';
 
 function BaseLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -98,6 +100,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
     { to: '/', label: 'Admin Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { to: '/payment-methods', label: 'Payment Methods', icon: <CreditCard className="w-4 h-4" /> },
     { to: '/wallet-allocation', label: 'Wallet Allocation', icon: <Smartphone className="w-4 h-4" /> },
+    { to: '/orange-sms', label: 'Orange SMS Reader', icon: <MessageSquareText className="w-4 h-4" /> },
     { to: '/wallet-dashboard', label: 'Wallet Dashboard', icon: <Sliders className="w-4 h-4" /> },
     { to: '/treasury', label: 'Treasury Hub', icon: <DollarSign className="w-4 h-4" /> },
     { to: '/operator-cockpit', label: 'Operator Cockpit', icon: <History className="w-4 h-4" /> },
@@ -902,6 +905,7 @@ export default function App() {
               <Route path="/" element={<PermissionGuard pageName="Admin Dashboard"><AdminDashboard /></PermissionGuard>} />
               <Route path="/payment-methods" element={<PermissionGuard pageName="Payment Methods"><PaymentMethods /></PermissionGuard>} />
               <Route path="/wallet-allocation" element={<PermissionGuard pageName="Wallet Allocation"><WalletAllocationEngine /></PermissionGuard>} />
+              <Route path="/orange-sms" element={<PermissionGuard pageName="Orange SMS Reader"><OrangeSmsReader /></PermissionGuard>} />
               <Route path="/wallet-dashboard" element={<PermissionGuard pageName="Wallet Dashboard"><WalletDashboard /></PermissionGuard>} />
               <Route path="/treasury" element={<PermissionGuard pageName="Treasury Hub"><TreasuryHub /></PermissionGuard>} />
               <Route path="/operator-cockpit" element={<PermissionGuard pageName="Operator Cockpit"><OperatorCockpit /></PermissionGuard>} />
