@@ -19,7 +19,8 @@ import {
   HelpCircle,
   Menu,
   X,
-  Smartphone
+  Smartphone,
+  Sliders
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LanguageProvider, useTranslation } from './context/LanguageContext';
@@ -35,6 +36,7 @@ import RBACStudio from './components/RBACStudio';
 import Commissions from './components/Commissions';
 import MerchantPortal from './components/MerchantPortal';
 import WalletAllocationEngine from './components/WalletAllocationEngine';
+import WalletDashboard from './components/WalletDashboard';
 
 function BaseLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -80,6 +82,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
     { to: '/', label: 'Admin Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { to: '/payment-methods', label: 'Payment Methods', icon: <CreditCard className="w-4 h-4" /> },
     { to: '/wallet-allocation', label: 'Wallet Allocation', icon: <Smartphone className="w-4 h-4" /> },
+    { to: '/wallet-dashboard', label: 'Wallet Dashboard', icon: <Sliders className="w-4 h-4" /> },
     { to: '/treasury', label: 'Treasury Hub', icon: <DollarSign className="w-4 h-4" /> },
     { to: '/operator-cockpit', label: 'Operator Cockpit', icon: <History className="w-4 h-4" /> },
     { to: '/local-depositors', label: 'Local Depositors', icon: <Users className="w-4 h-4" /> },
@@ -567,6 +570,7 @@ export default function App() {
             <Route path="/" element={<AdminDashboard />} />
             <Route path="/payment-methods" element={<PaymentMethods />} />
             <Route path="/wallet-allocation" element={<WalletAllocationEngine />} />
+            <Route path="/wallet-dashboard" element={<WalletDashboard />} />
             <Route path="/treasury" element={<TreasuryHub />} />
             <Route path="/operator-cockpit" element={<OperatorCockpit />} />
             <Route path="/local-depositors" element={<LocalDepositors />} />
