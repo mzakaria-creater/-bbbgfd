@@ -41,17 +41,66 @@
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.75);
+  position: relative;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(242, 244, 252, 0.72));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(195, 197, 217, 0.4);
+  border: 1px solid rgba(195, 197, 217, 0.65);
+  border-radius: 18px !important;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.95) inset,
+    0 -1px 0 rgba(93, 103, 136, 0.12) inset,
+    0 14px 0 -9px rgba(36, 48, 85, 0.12),
+    0 24px 42px -24px rgba(25, 39, 78, 0.38);
+  transform: translateZ(0);
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
 }
 
 .glass-card-sm {
-  background: rgba(255, 255, 255, 0.5);
+  position: relative;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.8), rgba(238, 241, 250, 0.58));
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(195, 197, 217, 0.25);
+  border: 1px solid rgba(195, 197, 217, 0.52);
+  border-radius: 16px !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 10px 0 -7px rgba(36, 48, 85, 0.1),
+    0 18px 34px -24px rgba(25, 39, 78, 0.34);
+  transform: translateZ(0);
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+@media (hover: hover) {
+  .glass-card:hover,
+  .glass-card-sm:hover {
+    transform: translate3d(0, -4px, 0);
+    border-color: rgba(112, 126, 174, 0.55);
+    box-shadow:
+      0 2px 0 rgba(255, 255, 255, 0.95) inset,
+      0 18px 0 -12px rgba(36, 48, 85, 0.14),
+      0 32px 52px -26px rgba(25, 39, 78, 0.46);
+  }
+}
+
+/* Sharper dimensional treatment for standard dashboard surfaces. */
+body :where(.bg-white.rounded-2xl, .bg-white\/80.rounded-\[32px\], .bg-white\/70.rounded-2xl, .bg-white\/84.rounded-2xl) {
+  border-radius: 16px !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 12px 0 -9px rgba(37, 52, 93, 0.12),
+    0 22px 38px -27px rgba(22, 37, 76, 0.42);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+@media (hover: hover) {
+  body :where(.bg-white.rounded-2xl, .bg-white\/80.rounded-\[32px\], .bg-white\/70.rounded-2xl, .bg-white\/84.rounded-2xl):hover {
+    transform: translateY(-3px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.98) inset,
+      0 17px 0 -12px rgba(37, 52, 93, 0.15),
+      0 30px 46px -27px rgba(22, 37, 76, 0.48);
+  }
 }
 
 .hide-scrollbar::-webkit-scrollbar {
@@ -71,4 +120,3 @@
 .ios-toggle-dot {
   @apply inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform duration-300;
 }
-
