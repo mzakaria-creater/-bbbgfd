@@ -21,6 +21,18 @@ import {
   Info
 } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
+import { 
+  isSupabaseConfigured, 
+  seedSupabaseIfNeeded, 
+  fetchSupabaseWallets, 
+  saveSupabaseWallet, 
+  deleteSupabaseWallet, 
+  executeSupabaseAllocate, 
+  executeSupabaseConfirm, 
+  executeSupabaseRelease, 
+  executeSupabaseResetDailyLimits, 
+  executeSupabaseResetMonthlyLimits 
+} from '../lib/supabase';
 
 interface Wallet {
   id: string;
@@ -209,6 +221,54 @@ export default function WalletAllocationEngine() {
 
   const [activeReservation, setActiveReservation] = useState<AllocationRecord | null>(null);
   const [reservationCountdown, setReservationCountdown] = useState<number>(900); // 15 mins
+
+  // Supabase states
+  const [supabaseLoading, setSupabaseLoading] = useState(false);
+  const [supabaseStatus, setSupabaseStatus] = useState<'idle' | 'connected' | 'error' | 'pending_migrations'>('idle');
+  const [supabaseMessage, setSupabaseMessage] = useState('');
+
+  // Initial Sync from Supabase
+  const pullFromSupabase = async (forceSeed = false) => {
+    if (!isSupabaseConfigured) return;
+    setSupabaseLoading(true);
+    try {
+      if (forceSeed) {
+        await seedSupabaseIfNeeded(wallets);
+      }
+      const { data, error } = await fetchSupabaseWallets();
+      if (error) {
+        setSupabaseStatus('pending_migrations');
+        setSupabaseMessage('Schema mismatch: Check if SQL migrations have been executed in your Supabase SQL editor.');
+      } else if (data) {
+        setWallets(data);
+        setSupabaseStatus('connected');
+        setSupabaseMessage('Sync active: Real-time PostgreSQL schema binding.');
+      }
+    } catch (e: any) {
+      setSupabaseStatus('error');
+      setSupabaseMessage(e.message || 'Supabase connection failed.');
+    } finally {
+      setSupabaseLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+      const initSupabase = async () => {
+        setSupabaseLoading(true);
+        // Seed default wallets if table is empty
+        const seedRes = await seedSupabaseIfNeeded(wallets);
+        if (seedRes && !seedRes.success && seedRes.reason === 'migration_needed') {
+          setSupabaseStatus('pending_migrations');
+          setSupabaseMessage('Table payment_wallets not found. Execute the SQL DDL commands in your Supabase tab.');
+          setSupabaseLoading(false);
+          return;
+        }
+        await pullFromSupabase();
+      };
+      initSupabase();
+    }
+  }, []);
 
   // Wallet Management Inputs
   const [newWalletNum, setNewWalletNum] = useState('');
@@ -444,7 +504,7 @@ export default function WalletAllocationEngine() {
   };
 
   // Add new wallet
-  const handleCreateWallet = (e: React.FormEvent) => {
+  const handleCreateWallet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWalletNum.trim() || !newWalletOwner.trim()) {
       alert("Please provide the wallet telephone digits and custodian owner's legal name.");
@@ -468,27 +528,57 @@ export default function WalletAllocationEngine() {
       priority: Number(newWalletPriority) || 5
     };
 
-    setWallets(prev => [...prev, newW]);
+    if (isSupabaseConfigured) {
+      setSupabaseLoading(true);
+      const res = await saveSupabaseWallet(newW);
+      if (res.error) {
+        alert("Failed to save wallet to Supabase database. Make sure table exists: " + res.error.message);
+      } else {
+        await pullFromSupabase();
+      }
+    } else {
+      setWallets(prev => [...prev, newW]);
+    }
+
     setNewWalletNum('');
     setNewWalletOwner('');
     setNewWalletLabel('');
     alert("New high-capacity PSP payment wallet added successfully!");
   };
 
-  const deleteWalletItem = (id: string) => {
+  const deleteWalletItem = async (id: string) => {
     if (window.confirm("Disposing this wallet will clear it from simulation parameters. Proceed?")) {
-      setWallets(prev => prev.filter(w => w.id !== id));
+      if (isSupabaseConfigured) {
+        setSupabaseLoading(true);
+        const res = await deleteSupabaseWallet(id);
+        if (res.error) {
+          alert("Failed to delete wallet from Supabase: " + res.error.message);
+        } else {
+          await pullFromSupabase();
+        }
+      } else {
+        setWallets(prev => prev.filter(w => w.id !== id));
+      }
     }
   };
 
-  const toggleWalletStatus = (id: string) => {
-    setWallets(prev => prev.map(w => {
-      if (w.id === id) {
-        const nextStatus: Wallet['status'] = w.status === 'active' ? 'paused' : w.status === 'paused' ? 'disabled' : 'active';
-        return { ...w, status: nextStatus };
+  const toggleWalletStatus = async (id: string) => {
+    const targetWallet = wallets.find(w => w.id === id);
+    if (!targetWallet) return;
+    const nextStatus: Wallet['status'] = targetWallet.status === 'active' ? 'paused' : targetWallet.status === 'paused' ? 'disabled' : 'active';
+    
+    const updatedWallet = { ...targetWallet, status: nextStatus };
+    if (isSupabaseConfigured) {
+      setSupabaseLoading(true);
+      const res = await saveSupabaseWallet(updatedWallet);
+      if (res.error) {
+        alert("Failed to update wallet status on Supabase: " + res.error.message);
+      } else {
+        await pullFromSupabase();
       }
-      return w;
-    }));
+    } else {
+      setWallets(prev => prev.map(w => w.id === id ? updatedWallet : w));
+    }
   };
 
   return (
@@ -505,6 +595,42 @@ export default function WalletAllocationEngine() {
           <p className="text-xs text-on-surface-variant mt-1.5 leading-relaxed">
             {t("Real-time capacity optimizer and multiplexer for Egyptian P2P deposits. Respects 60K/200K EGP regulatory limits per line.")}
           </p>
+
+          {/* Supabase Connection Status Banner */}
+          <div className="mt-3.5 flex flex-wrap items-center gap-2">
+            {!isSupabaseConfigured ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                <span>SUPABASE SIMULATOR MODE (OFFLINE)</span>
+              </span>
+            ) : supabaseStatus === 'connected' ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                <span>SUPABASE LIVE DATABASE ACTIVE</span>
+              </span>
+            ) : supabaseStatus === 'pending_migrations' ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                <span>SUPABASE SETUP PENDING (MIGRATIONS NEEDED)</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                <span>SUPABASE ERROR: {supabaseMessage.toUpperCase()}</span>
+              </span>
+            )}
+            
+            {isSupabaseConfigured && (
+              <button 
+                onClick={() => pullFromSupabase(true)}
+                disabled={supabaseLoading}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-900 text-white text-[9px] font-bold hover:bg-slate-800 disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={`w-2.5 h-2.5 ${supabaseLoading ? 'animate-spin' : ''}`} />
+                <span>FORCE RESYNC & SEED</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Floating Quick Stats */}
@@ -1133,25 +1259,27 @@ export default function WalletAllocationEngine() {
           </div>
         )}
 
-        {/* Tab 4: Supabase / Postgres Migration DDL Code */}
+        {/* Tab 4: Supabase / Postgres Migration DDL & RPC Code */}
         {activeTab === 'ddl' && (
-          <div className="bg-[#0f172a] text-slate-300 p-8 rounded-[32px] border border-slate-800 shadow-xl space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
+          <div className="bg-[#0f172a] text-slate-300 p-6 md:p-8 rounded-[32px] border border-slate-800 shadow-xl space-y-6">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-slate-800 pb-5 gap-4">
               <div>
-                <span className="px-3.5 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full text-[10px] font-black uppercase tracking-wider text-orange-400">
-                  {t("SUPABASE / ENHANCED POSTGRES DDL")}
+                <span className="px-3.5 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[10px] font-black uppercase tracking-wider text-indigo-400">
+                  {t("SUPABASE / ENHANCED POSTGRES DDL & RPC ENGINE")}
                 </span>
                 <h4 className="text-xl font-black text-white mt-1.5">
-                  📚 {t("Production DB Migration Script Schema")}
+                  📚 {t("Supabase Database & RPC Multi-Lock Engine")}
                 </h4>
                 <p className="text-xs text-slate-400 mt-1">
-                  {t("Copy this highly robust SQL structure. Includes index structures, transactional lock safeties, and triggers for auto-expiry releasing.")}
+                  {t("Access production-grade database files. Select a sub-tab to copy and test transactional SELECT FOR UPDATE procedures in real-time.")}
                 </p>
               </div>
 
-              <button
-                onClick={() => {
-                  const sqlCode = `-------------------------------------------------------------
+              {/* RPC Code Copiers */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    const sqlCode = `-------------------------------------------------------------
 -- FINLUX MOBILE WALLET MULTIPLEX ALLOCATION ENGINE MIGRATE
 -- EGYPT LOCAL DEPOSITS CAPACITY GATEWAY FOR TRADING CLIENTS
 -------------------------------------------------------------
@@ -1199,106 +1327,530 @@ CREATE TABLE IF NOT EXISTS wallet_allocation_items (
     wallet_id UUID REFERENCES payment_wallets(id),
     allocated_amount NUMERIC NOT NULL CHECK (allocated_amount > 0),
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
-);
+);`;
 
+                    navigator.clipboard.writeText(sqlCode);
+                    setCopiedSql(true);
+                    setTimeout(() => setCopiedSql(false), 3000);
+                    alert(t("Database table schemas copied to clipboard!"));
+                  }}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Database className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>{t("Copy Tables Schema")}</span>
+                </button>
 
--- 4) COMPLIANCE AUTOMATIC TIME EXPIRE LOCK TRIGGER FUNCTION
--- For PostgreSQL to automatically unlock capacities if unconfirmed post 15 mins
-CREATE OR REPLACE FUNCTION fn_release_expired_capacity_locks()
-RETURNS TRIGGER AS $$
+                <button
+                  onClick={() => {
+                    const rpcSql = `----------------------------------------------------------------------------
+-- FINLUX SUPABASE RPC TRANSACTION ALLOCATION PROCEDURES
+----------------------------------------------------------------------------
+
+-- 1) allocate_wallets: Sequential SELECT FOR UPDATE Locks & Reserves Capacity
+CREATE OR REPLACE FUNCTION allocate_wallets(
+  p_amount NUMERIC,
+  p_provider TEXT,
+  p_duration_minutes INT DEFAULT 15
+)
+RETURNS UUID AS $$
+DECLARE
+  v_allocation_id UUID;
+  v_wallet RECORD;
+  v_remaining_amount NUMERIC := p_amount;
+  v_allocated_amount NUMERIC;
+  v_wallet_avail NUMERIC;
 BEGIN
-    IF (NEW.status IN ('Cancelled', 'Expired', 'Rejected')) AND (OLD.status = 'Reserved') THEN
-        -- Relieve from payment_wallets
-        UPDATE payment_wallets w
-        SET reserved_today = GREATEST(0, w.reserved_today - item.allocated_amount)
-        FROM wallet_allocation_items item
-        WHERE item.allocation_id = NEW.id AND item.wallet_id = w.id;
-    ELSIF (NEW.status = 'Confirmed') AND (OLD.status = 'Reserved') THEN
-        -- Convert reserves to permanent live Used volume metrics
-        UPDATE payment_wallets w
-        SET reserved_today = GREATEST(0, w.reserved_today - item.allocated_amount),
-            used_today = w.used_today + item.allocated_amount,
-            used_month = w.used_month + item.allocated_amount
-        FROM wallet_allocation_items item
-        WHERE item.allocation_id = NEW.id AND item.wallet_id = w.id;
+  IF p_amount <= 0 THEN
+    RAISE EXCEPTION 'Allocation amount must be greater than zero. Received: %', p_amount;
+  END IF;
+
+  INSERT INTO wallet_allocations (amount, status, created_at, expires_at)
+  VALUES (p_amount, 'Reserved', NOW(), NOW() + (p_duration_minutes || ' minutes')::INTERVAL)
+  RETURNING id INTO v_allocation_id;
+
+  FOR v_wallet IN (
+    SELECT id, daily_limit, monthly_limit, used_today, used_month, reserved_today
+    FROM payment_wallets
+    WHERE provider = p_provider AND status = 'active'
+    ORDER BY priority DESC, id ASC
+    FOR UPDATE
+  ) LOOP
+    IF v_remaining_amount <= 0 THEN
+      EXIT;
     END IF;
-    RETURN NEW;
+
+    v_wallet_avail := LEAST(
+      v_wallet.daily_limit - v_wallet.used_today - v_wallet.reserved_today,
+      v_wallet.monthly_limit - v_wallet.used_month - v_wallet.reserved_today
+    );
+
+    IF v_wallet_avail > 0 THEN
+      v_allocated_amount := LEAST(v_remaining_amount, v_wallet_avail);
+      
+      INSERT INTO wallet_allocation_items (allocation_id, wallet_id, allocated_amount)
+      VALUES (v_allocation_id, v_wallet.id, v_allocated_amount);
+
+      UPDATE payment_wallets
+      SET reserved_today = reserved_today + v_allocated_amount
+      WHERE id = v_wallet.id;
+
+      v_remaining_amount := v_remaining_amount - v_allocated_amount;
+    END IF;
+  END LOOP;
+
+  IF v_remaining_amount > 0 THEN
+    RAISE EXCEPTION 'Insufficient capacity available on active % wallets. Missing EGP %', p_provider, v_remaining_amount;
+  END IF;
+
+  RETURN v_allocation_id;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_wallet_allocation_lock_status_handler
-AFTER UPDATE ON wallet_allocations
-FOR EACH ROW
-EXECUTE FUNCTION fn_release_expired_capacity_locks();`;
+-- 2) confirm_wallet_allocation: Converts holds to spent limits
+CREATE OR REPLACE FUNCTION confirm_wallet_allocation(p_allocation_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+  v_alloc_status TEXT;
+  v_item RECORD;
+BEGIN
+  SELECT status INTO v_alloc_status FROM wallet_allocations WHERE id = p_allocation_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Allocation not found'; END IF;
+  
+  IF v_alloc_status = 'Confirmed' THEN RETURN TRUE;
+  ELSIF v_alloc_status != 'Reserved' THEN RAISE EXCEPTION 'Cannot confirm state %', v_alloc_status;
+  END IF;
 
-                  navigator.clipboard.writeText(sqlCode);
-                  setCopiedSql(true);
-                  setTimeout(() => setCopiedSql(false), 3000);
-                  alert(t("Supabase SQL DDL code successfully copied to your system clipboard!"));
-                }}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span>{copiedSql ? t("Copied!") : t("Copy schema to clipboard")}</span>
-              </button>
+  FOR v_item IN (SELECT wallet_id, allocated_amount FROM wallet_allocation_items WHERE allocation_id = p_allocation_id FOR UPDATE) LOOP
+    UPDATE payment_wallets
+    SET reserved_today = GREATEST(0, reserved_today - v_item.allocated_amount),
+        used_today = used_today + v_item.allocated_amount,
+        used_month = used_month + v_item.allocated_amount
+    WHERE id = v_item.wallet_id;
+  END LOOP;
+
+  UPDATE wallet_allocations SET status = 'Confirmed' WHERE id = p_allocation_id;
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 3) release_wallet_allocation: Returns capacities if cancelled or expired
+CREATE OR REPLACE FUNCTION release_wallet_allocation(p_allocation_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+  v_alloc_status TEXT;
+  v_item RECORD;
+BEGIN
+  SELECT status INTO v_alloc_status FROM wallet_allocations WHERE id = p_allocation_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Allocation not found'; END IF;
+  
+  IF v_alloc_status IN ('Cancelled', 'Expired', 'Rejected') THEN RETURN TRUE;
+  ELSIF v_alloc_status = 'Confirmed' THEN RAISE EXCEPTION 'Cannot release confirmed settlement';
+  END IF;
+
+  FOR v_item IN (SELECT wallet_id, allocated_amount FROM wallet_allocation_items WHERE allocation_id = p_allocation_id FOR UPDATE) LOOP
+    UPDATE payment_wallets
+    SET reserved_today = GREATEST(0, reserved_today - v_item.allocated_amount)
+    WHERE id = v_item.wallet_id;
+  END LOOP;
+
+  UPDATE wallet_allocations SET status = 'Cancelled' WHERE id = p_allocation_id;
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 4) reset_wallet_daily_limits: Administrative rolling clean
+CREATE OR REPLACE FUNCTION reset_wallet_daily_limits()
+RETURNS VOID AS $$
+BEGIN
+  UPDATE payment_wallets SET used_today = 0.00, reserved_today = 0.00;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 5) reset_wallet_monthly_limits: Administrative rolling clean
+CREATE OR REPLACE FUNCTION reset_wallet_monthly_limits()
+RETURNS VOID AS $$
+BEGIN
+  UPDATE payment_wallets SET used_month = 0.00;
+END;
+$$ LANGUAGE plpgsql;`;
+
+                    navigator.clipboard.writeText(rpcSql);
+                    alert(t("All 5 Supabase PL/pgSQL RPC Functions copied successfully! Ready for Supabase SQL Editor."));
+                  }}
+                  className="px-3 py-1.5 bg-[#006c49] hover:bg-[#005237] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Lock className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>{t("Copy 5 Allocation RPCs")}</span>
+                </button>
+              </div>
             </div>
 
-            {/* SQL Terminal Viewer */}
-            <div className="bg-[#030712] border border-slate-800 rounded-2xl p-5 overflow-x-auto font-mono text-[11px] leading-relaxed text-slate-300 max-h-[460px] overflow-y-auto">
-              <p className="text-slate-500 font-bold mb-4">-- FINLUX MOBILE WALLET MULTIPLEX ALLOCATION ENGINE MIGRATE --</p>
-              
-              <span className="text-emerald-400 font-black">-- 1) PAYMENT_WALLETS Inventory Line</span><br/>
-              <span className="text-indigo-400">CREATE TABLE</span> IF NOT EXISTS payment_wallets (<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;id UUID PRIMARY KEY DEFAULT gen_random_uuid(),<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;provider TEXT NOT NULL DEFAULT <span className="text-orange-400">'Vodafone Cash'</span>,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;wallet_number TEXT NOT NULL <span className="text-indigo-400">UNIQUE</span>,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;owner_name TEXT,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;label TEXT,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;country TEXT DEFAULT <span className="text-orange-400">'Egypt'</span>,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;currency TEXT DEFAULT <span className="text-orange-400">'EGP'</span>,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;status TEXT DEFAULT <span className="text-orange-400">'active'</span> CHECK (status IN (<span className="text-orange-400">'active'</span>, <span className="text-orange-400">'paused'</span>, <span className="text-orange-400">'disabled'</span>)),<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;daily_limit NUMERIC NOT NULL DEFAULT <span className="text-teal-400">60000.00</span>,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;monthly_limit NUMERIC NOT NULL DEFAULT <span className="text-teal-400">200000.00</span>,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;used_today NUMERIC NOT NULL DEFAULT <span className="text-teal-400">0.00</span>,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;used_month NUMERIC NOT NULL DEFAULT <span className="text-teal-400">0.00</span>,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;reserved_today NUMERIC NOT NULL DEFAULT <span className="text-teal-400">0.00</span>,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;priority INT NOT NULL DEFAULT <span className="text-teal-400">5</span><br/>
-              );<br/><br/>
+            {/* Simulated Live RPC Executive Panel */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 bg-[#030712] p-5 rounded-2xl border border-slate-800">
+              <div className="lg:col-span-4 space-y-4">
+                <span className="text-[10px] font-black text-[#5182ff] uppercase tracking-widest block">🛠️ {t("RPC Live Playground Console")}</span>
+                <p className="text-xs text-slate-400">
+                  {t("Interact with the allocation engine using direct RPC hooks. Simulates exact locks, priority sequences, and limit conditions.")}
+                </p>
 
-              <span className="text-slate-500">-- High index coverage for query optimization</span><br/>
-              <span className="text-indigo-400">CREATE INDEX</span> IF NOT EXISTS idx_payment_wallets_allocation_lookup <br/>
-              ON payment_wallets (status, priority DESC, daily_limit, used_today, reserved_today);<br/><br/>
+                <div className="space-y-2.5 pt-2">
+                  <label className="block text-[11px] font-bold text-slate-350">{t("Select Provider Endpoint")}</label>
+                  <select 
+                    id="rpc_provider_val"
+                    className="w-full bg-slate-900 border border-slate-850 rounded-xl px-3 py-2 text-xs text-white"
+                  >
+                    <option value="Vodafone Cash">Vodafone Cash</option>
+                    <option value="Etisalat Cash">Etisalat Cash</option>
+                    <option value="Orange Cash">Orange Cash</option>
+                  </select>
 
-              <span className="text-emerald-400">-- 2) WALLET_ALLOCATIONS Parent Record</span><br/>
-              <span className="text-indigo-400">CREATE TABLE</span> IF NOT EXISTS wallet_allocations (<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;id UUID PRIMARY KEY DEFAULT gen_random_uuid(),<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;amount NUMERIC NOT NULL CHECK (amount &gt; <span className="text-teal-400">0</span>),<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;status TEXT DEFAULT <span className="text-orange-400">'Reserved'</span> CHECK (status IN (<span className="text-orange-400">'Reserved'</span>, <span className="text-orange-400">'Confirmed'</span>, <span className="text-orange-400">'Cancelled'</span>, <span className="text-orange-400">'Expired'</span>, <span className="text-orange-400">'Rejected'</span>)),<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;fallback_used TEXT DEFAULT <span className="text-orange-400">'None'</span> CHECK (fallback_used IN (<span className="text-orange-400">'None'</span>, <span className="text-orange-400">'Bank Transfer'</span>, <span className="text-orange-400">'InstaPay'</span>, <span className="text-orange-400">'Manual Support'</span>)),<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;expires_at TIMESTAMPTZ DEFAULT (now() + interval <span className="text-orange-400">'15 minutes'</span>) NOT NULL<br/>
-              );<br/><br/>
+                  <label className="block text-[11px] font-bold text-slate-350">{t("Target Allocation Volume")}</label>
+                  <input 
+                    type="number"
+                    id="rpc_amount_val"
+                    defaultValue="35000"
+                    className="w-full bg-slate-900 border border-slate-850 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                  />
+                </div>
 
-              <span className="text-emerald-400">-- 3) WALLET_ALLOCATION_ITEMS Child Breakdown</span><br/>
-              <span className="text-indigo-400">CREATE TABLE</span> IF NOT EXISTS wallet_allocation_items (<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;id UUID PRIMARY KEY DEFAULT gen_random_uuid(),<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;allocation_id UUID REFERENCES wallet_allocations(id) ON DELETE CASCADE,<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;wallet_id UUID REFERENCES payment_wallets(id),<br/>
-              &nbsp;&nbsp;&nbsp;&nbsp;allocated_amount NUMERIC NOT NULL CHECK (allocated_amount &gt; <span className="text-teal-400">0</span>)<br/>
-              );<br/><br/>
+                <div className="pt-2 space-y-2">
+                  <button
+                    onClick={async () => {
+                      const amount = Number((document.getElementById('rpc_amount_val') as HTMLInputElement)?.value || 35000);
+                      const provider = (document.getElementById('rpc_provider_val') as HTMLSelectElement)?.value || 'Vodafone Cash';
+                      const logConsole = document.getElementById('rpc_logs');
+                      if(!logConsole) return;
 
-              <span className="text-emerald-400">-- 4) COMPLIANCE AUTOMATIC TIME EXPIRE LOCK TRIGGER FUNCTION --</span><br/>
-              <span className="text-pink-400">CREATE TRIGGER</span> trg_wallet_allocation_lock_status_handler<br/>
-              AFTER UPDATE ON wallet_allocations<br/>
-              FOR EACH ROW EXECUTE FUNCTION fn_release_expired_capacity_locks();
+                      if (isSupabaseConfigured) {
+                        logConsole.innerText = `[Supabase] Contacting database... Executing allocate_wallets(p_amount := ${amount}, p_provider := '${provider}')...`;
+                        setSupabaseLoading(true);
+                        const res = await executeSupabaseAllocate(amount, provider);
+                        setSupabaseLoading(false);
+                        if (res.error) {
+                          logConsole.innerText = `[Supabase Err] Direct call failed:\n${JSON.stringify(res.error, null, 2)}\n\n💡 Ensure you have executed the 5 schema functions (RPCs) under Tab 4 inside your Supabase SQL editor first!`;
+                          alert("Supabase RPC failed. Check console log for detailed schema error.");
+                        } else {
+                          logConsole.innerText = `[Supabase Success] RPC allocate_wallets() finished successfully!\nReturned Allocation UUID Reference: "${res.allocationId}"\n\nReloading wallet balances from database...`;
+                          await pullFromSupabase();
+                          
+                          // Create visual record in history
+                          const nowStr = new Date().toLocaleString();
+                          const expiresStr = new Date(Date.now() + 15 * 60000).toLocaleString();
+                          const newAlloc: AllocationRecord = {
+                            id: res.allocationId || 'ALC-Live',
+                            amount: amount,
+                            status: 'Reserved',
+                            created_at: nowStr,
+                            expires_at: expiresStr,
+                            items: [
+                              {
+                                wallet_id: 'Supabase-Managed',
+                                wallet_number: 'Database Locked',
+                                provider: provider,
+                                allocated_amount: amount
+                              }
+                            ],
+                            fallback_used: 'None'
+                          };
+                          setAllocations(prev => [newAlloc, ...prev]);
+                          setActiveReservation(newAlloc);
+                          setReservationCountdown(900);
+                        }
+                        return;
+                      }
+
+                      let matchedWallets = wallets.filter(w => w.provider === provider && w.status === 'active');
+                      matchedWallets = [...matchedWallets].sort((a,b) => b.priority - a.priority);
+
+                      let logText = `--- [BEGIN TRANSACTION: allocate_wallets] ---\n`;
+                      logText += `[1/4] INITIALIZING RPC PARAMS: amount=${amount} EGP, provider="${provider}"\n`;
+                      logText += `[2/4] SEQUENTIAL ROW LOCKING: Querying table payment_wallets with FOR UPDATE...\n`;
+
+                      let remaining = amount;
+                      const allocatedItemsArr: { label: string; amount: number; id: string }[] = [];
+
+                      for (const wallet of matchedWallets) {
+                        if (remaining <= 0) break;
+                        const avail = Math.min(
+                          wallet.daily_limit - wallet.used_today - wallet.reserved_today,
+                          wallet.monthly_limit - wallet.used_month - wallet.reserved_today
+                        );
+                        
+                        logText += `  > [ROW LOCK ACQUIRED] Wallet "${wallet.label}" (ID: ${wallet.id}) - Current used=${wallet.used_today}, reserve=${wallet.reserved_today}, limit=${wallet.daily_limit} EGP. Available capacity: ${avail} EGP\n`;
+                        
+                        if (avail > 0) {
+                          const spend = Math.min(remaining, avail);
+                          allocatedItemsArr.push({ label: wallet.label, amount: spend, id: wallet.id });
+                          remaining -= spend;
+                          logText += `    [RESERVATION COMMITTED] Reserved ${spend} EGP. Remaining allocate volume: ${remaining} EGP\n`;
+                        } else {
+                          logText += `    [SKIPPED] Wallet has 0 available margin.\n`;
+                        }
+                      }
+
+                      if (remaining > 0) {
+                        logText += `[ROLLBACK] EXCEPTION RAISED: Insufficient capacity available on active "${provider}" wallets. Missing EGP ${remaining}.\n`;
+                        logText += `--- [TRANSACTION FAILED & ROLLBACK COMPLETED] ---\n`;
+                        logConsole.innerText = logText;
+                        alert(t("RPC Exception raised: Insufficient capacity for ") + provider);
+                        return;
+                      }
+
+                      // Apply simulation holds in state
+                      const mockAllocId = 'alc-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+                      
+                      setWallets(prev => prev.map(w => {
+                        const itemMatch = allocatedItemsArr.find(item => item.id === w.id);
+                        if (itemMatch) {
+                          return { ...w, reserved_today: w.reserved_today + itemMatch.amount };
+                        }
+                        return w;
+                      }));
+
+                      const nowStr = new Date().toLocaleString();
+                      const expiresStr = new Date(Date.now() + 15 * 60000).toLocaleString();
+                      
+                      const newAlloc: AllocationRecord = {
+                        id: mockAllocId,
+                        amount: amount,
+                        status: 'Reserved',
+                        created_at: nowStr,
+                        expires_at: expiresStr,
+                        items: allocatedItemsArr.map(item => ({
+                          wallet_id: item.id,
+                          wallet_number: '010******',
+                          provider: provider,
+                          allocated_amount: item.amount
+                        })),
+                        fallback_used: 'None'
+                      };
+
+                      setAllocations(prev => [newAlloc, ...prev]);
+
+                      logText += `[3/4] PARENT LOG CREATED: wallet_allocations.id="${mockAllocId}", status="Reserved", expires_at="${expiresStr}"\n`;
+                      logText += `[4/4] COMMIT COMPLETED: Capacity locked. Ready to confirm.\n`;
+                      logText += `--- [END TRANSACTION SUCCESSful. returned ID="${mockAllocId}"] ---\n`;
+                      
+                      logConsole.innerText = logText;
+                    }}
+                    className="w-full bg-[#006c49] hover:bg-emerald-700 text-white py-2.5 rounded-xl text-xs font-black transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Smartphone className="w-4 h-4 text-emerald-350" />
+                    <span>{t("Execute: allocate_wallets()")}</span>
+                  </button>
+
+                  <div className="grid grid-cols-2 gap-2 text-center text-[10px]">
+                    <button
+                      onClick={async () => {
+                        const logConsole = document.getElementById('rpc_logs');
+                        if(!logConsole) return;
+
+                        // Find first Reserved allocation if any
+                        const target = allocations.find(a => a.status === 'Reserved');
+                        if (!target) {
+                          alert(t("No pending 'Reserved' allocations available to confirm. Run allocate_wallets() first."));
+                          return;
+                        }
+
+                        if (isSupabaseConfigured) {
+                          logConsole.innerText = `[Supabase] Contacting database... Executing confirm_wallet_allocation('${target.id}')...`;
+                          setSupabaseLoading(true);
+                          const res = await executeSupabaseConfirm(target.id);
+                          setSupabaseLoading(false);
+                          if (res.error) {
+                            logConsole.innerText = `[Supabase Err] Confirm action failed:\n${JSON.stringify(res.error, null, 2)}`;
+                            alert("Supabase confirm transaction failed.");
+                          } else {
+                            logConsole.innerText = `[Supabase Success] RPC confirm_wallet_allocation() finished successfully on live database!\nBalances locked into Used parameters successfully.`;
+                            setAllocations(prev => prev.map(a => a.id === target.id ? { ...a, status: 'Confirmed' } : a));
+                            if (activeReservation?.id === target.id) {
+                              setActiveReservation(null);
+                            }
+                            await pullFromSupabase();
+                          }
+                          return;
+                        }
+
+                        confirmAllocation(target.id);
+                        
+                        let logText = `--- [BEGIN TRANSACTION: confirm_wallet_allocation] ---\n`;
+                        logText += `[1/3] locking record allocations.id="${target.id}" FOR UPDATE\n`;
+                        target.items.forEach(itm => {
+                          logText += `  > locking wallet id="${itm.wallet_id}" FOR UPDATE\n`;
+                          logText += `    applying used spend: incremental used_today = used_today + ${itm.allocated_amount}\n`;
+                          logText += `    releasing holding reserve: reserved_today = reserved_today - ${itm.allocated_amount}\n`;
+                        });
+                        logText += `[2/3] updating wallet_allocations status to "Confirmed"\n`;
+                        logText += `[3/3] TRANSACTION COMMITTED successfully.\n`;
+                        logText += `--- [END] ---\n`;
+                        logConsole.innerText = logText;
+                      }}
+                      className="bg-slate-800 hover:bg-slate-750 text-slate-100 p-2 rounded-lg font-bold border border-slate-750 cursor-pointer"
+                    >
+                      {t("confirm_allocation()")}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const logConsole = document.getElementById('rpc_logs');
+                        if(!logConsole) return;
+
+                        const target = allocations.find(a => a.status === 'Reserved');
+                        if (!target) {
+                          alert(t("No pending 'Reserved' allocations available to release."));
+                          return;
+                        }
+
+                        if (isSupabaseConfigured) {
+                          logConsole.innerText = `[Supabase] Contacting database... Executing release_wallet_allocation('${target.id}')...`;
+                          setSupabaseLoading(true);
+                          const res = await executeSupabaseRelease(target.id);
+                          setSupabaseLoading(false);
+                          if (res.error) {
+                            logConsole.innerText = `[Supabase Err] Release action failed:\n${JSON.stringify(res.error, null, 2)}`;
+                            alert("Supabase release transaction failed.");
+                          } else {
+                            logConsole.innerText = `[Supabase Success] RPC release_wallet_allocation() finished successfully on live database!\nHolds released. Status changed to "Cancelled".`;
+                            setAllocations(prev => prev.map(a => a.id === target.id ? { ...a, status: 'Cancelled' } : a));
+                            if (activeReservation?.id === target.id) {
+                              setActiveReservation(null);
+                            }
+                            await pullFromSupabase();
+                          }
+                          return;
+                        }
+
+                        setAllocations(prev => prev.map(a => a.id === target.id ? { ...a, status: 'Cancelled' } : a));
+                        setWallets(prev => prev.map(w => {
+                          const match = target.items.find(item => item.wallet_id === w.id);
+                          if(match) {
+                            return { ...w, reserved_today: Math.max(0, w.reserved_today - match.allocated_amount) };
+                          }
+                          return w;
+                        }));
+
+                        let logText = `--- [BEGIN TRANSACTION: release_wallet_allocation] ---\n`;
+                        logText += `[1/2] unlocking holdings for allocations.id="${target.id}" FOR UPDATE\n`;
+                        target.items.forEach(itm => {
+                          logText += `  > decrementing reserved holds on wallet_id="${itm.wallet_id}" by ${itm.allocated_amount} EGP\n`;
+                        });
+                        logText += `[2/2] setting transaction status to "Cancelled" in wallet_allocations\n`;
+                        logText += `--- [END TRANSACTION SUCCESS] ---\n`;
+                        logConsole.innerText = logText;
+                      }}
+                      className="bg-slate-800 hover:bg-slate-750 text-slate-100 p-2 rounded-lg font-bold border border-slate-750 cursor-pointer"
+                    >
+                      {t("release_allocation()")}
+                    </button>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-850 space-y-2">
+                    <span className="text-[9px] text-slate-400 block uppercase tracking-wider">📅 {t("Administrative Schedulers")}</span>
+                    <button
+                      onClick={async () => {
+                        const logConsole = document.getElementById('rpc_logs');
+                        if (isSupabaseConfigured) {
+                          if (logConsole) logConsole.innerText = `[Supabase] Contacting database... Executing reset_wallet_daily_limits()...`;
+                          setSupabaseLoading(true);
+                          const res = await executeSupabaseResetDailyLimits();
+                          setSupabaseLoading(false);
+                          if (res.error) {
+                            if (logConsole) logConsole.innerText = `[Supabase Err] Reset failed:\n${JSON.stringify(res.error, null, 2)}`;
+                            alert("Failed to reset daily parameters on Supabase.");
+                          } else {
+                            if (logConsole) logConsole.innerText = `[Supabase Success] Daily parameters reset successfully on active database table payment_wallets.`;
+                            await pullFromSupabase();
+                            alert(t("Dynamic daily limit bounds reset completely. DB logs created."));
+                          }
+                          return;
+                        }
+
+                        setWallets(prev => prev.map(w => ({ ...w, used_today: 0, reserved_today: 0 })));
+                        if(logConsole) {
+                          logConsole.innerText = `--- [ADMIN SCHEDULER: reset_wallet_daily_limits] ---\nTIMESTAMP: ${new Date().toUTCString()}\nSUCCESS: Automated nightly cron has executed successfully. used_today flushes to 0.00 EGP, reserved_today flushed across 5 active P2P nodes.`;
+                        }
+                        alert(t("Dynamic daily limit bounds reset completely. DB logs created."));
+                      }}
+                      className="w-full bg-slate-900 hover:bg-slate-850 text-slate-350 p-2.5 rounded-lg border border-slate-800 text-[10px] font-mono hover:text-white transition-colors cursor-pointer"
+                    >
+                      {t("Run: reset_wallet_daily_limits()")}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const logConsole = document.getElementById('rpc_logs');
+                        if (isSupabaseConfigured) {
+                          if (logConsole) logConsole.innerText = `[Supabase] Contacting database... Executing reset_wallet_monthly_limits()...`;
+                          setSupabaseLoading(true);
+                          const res = await executeSupabaseResetMonthlyLimits();
+                          setSupabaseLoading(false);
+                          if (res.error) {
+                            if (logConsole) logConsole.innerText = `[Supabase Err] Reset failed:\n${JSON.stringify(res.error, null, 2)}`;
+                            alert("Failed to reset monthly parameters on Supabase.");
+                          } else {
+                            if (logConsole) logConsole.innerText = `[Supabase Success] Monthly parameters reset successfully on active database table payment_wallets.`;
+                            await pullFromSupabase();
+                            alert(t("Dynamic monthly spent parameters reset completely."));
+                          }
+                          return;
+                        }
+
+                        setWallets(prev => prev.map(w => ({ ...w, used_month: 0 })));
+                        if(logConsole) {
+                          logConsole.innerText = `--- [ADMIN SCHEDULER: reset_wallet_monthly_limits] ---\nTIMESTAMP: ${new Date().toUTCString()}\nSUCCESS: Automated monthly first-day limits clean triggers. used_month fields reset to 0.00 EGP.`;
+                        }
+                        alert(t("Dynamic monthly spent parameters reset completely."));
+                      }}
+                      className="w-full bg-slate-900 hover:bg-slate-850 text-slate-350 p-2.5 rounded-lg border border-slate-800 text-[10px] font-mono hover:text-white transition-colors cursor-pointer"
+                    >
+                      {t("Run: reset_wallet_monthly_limits()")}
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* RPC Query Log Terminal Monitor screen */}
+              <div className="lg:col-span-8 flex flex-col justify-between bg-[#030712] rounded-2xl border border-slate-800 p-4">
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase select-none flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                      {t("PostgreSQL Database RPC Log Monitor")}
+                    </span>
+                    <button 
+                      onClick={() => {
+                        const log = document.getElementById('rpc_logs');
+                        if(log) log.innerText = `-- Ready for transaction events. Execute an RPC function using the left controls to monitor the query parser runtime results --`;
+                      }}
+                      className="text-[9px] hover:underline text-slate-500 font-bold cursor-pointer"
+                    >
+                      {t("Clear Console Log")}
+                    </button>
+                  </div>
+
+                  <div 
+                    id="rpc_logs"
+                    className="bg-[#010307] border border-slate-850 rounded-lg p-4 font-mono text-[10px] text-slate-350 leading-relaxed max-h-[300px] overflow-y-auto whitespace-pre-wrap select-text text-left"
+                  >
+                    -- Ready for transaction events. Execute an RPC function using the left controls to monitor the query parser runtime results --
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-850 text-[10px] leading-relaxed text-slate-400 space-y-1 text-left">
+                  <p className="font-bold text-slate-300">💡 SELECT FOR UPDATE transactional locking:</p>
+                  <p>
+                    By enforcing row locks sequentially during candidate lookup, parallel transactions are queued at the database engine level, preventing dirty reads or overlapping reserves on Vodafone and Instapay lines entirely.
+                  </p>
+                </div>
+              </div>
             </div>
-            
+
             {/* Guide Info */}
-            <div className="bg-slate-800 p-5 rounded-2xl text-[11px] flex items-start gap-3">
-              <Info className="w-5 h-5 text-indigo-300 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-white block font-bold mb-1">How This Solves the Double Allocation Problem:</strong>
-                <p className="leading-relaxed text-slate-350">
-                  By committing a <code className="text-indigo-300">Reserved</code> status instantly upon client selection, subsequent users loading checkouts are presented with updated bounds. Triggers automatically clean expired holds to sustain dynamic fluidity when bills go unpaid.
+            <div className="bg-slate-800/40 p-5 rounded-2xl text-[11px] flex items-start gap-3 border border-slate-800">
+              <Info className="w-4.5 h-4.5 text-indigo-300 shrink-0 mt-0.5" />
+              <div className="text-left">
+                <strong className="text-white block font-bold mb-1">{t("Production Integration Safety Guideline:")}</strong>
+                <p className="leading-relaxed text-slate-450">
+                  {t("These PL/pgSQL routines match our offline allocation models exactly. When writing to Supabase, run the full schema script first. Administrative functions should be triggerable via standard scheduled pg_cron procedures to refresh the rolling bounds.")}
                 </p>
               </div>
             </div>

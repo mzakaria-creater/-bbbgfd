@@ -31,6 +31,13 @@ import {
   Ban
 } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
+import { 
+  isSupabaseConfigured, 
+  fetchSupabaseWallets, 
+  saveSupabaseWallet, 
+  deleteSupabaseWallet,
+  seedSupabaseIfNeeded
+} from '../lib/supabase';
 
 interface Wallet {
   id: string;
@@ -166,51 +173,105 @@ export default function WalletDashboard() {
     ];
   });
 
-  // Sync to database key
+  // Supabase state managers
+  const [supabaseLoading, setSupabaseLoading] = useState(false);
+
+  const pullFromSupabase = async (forceSeed = false) => {
+    if (!isSupabaseConfigured) return;
+    setSupabaseLoading(true);
+    try {
+      if (forceSeed) {
+        await seedSupabaseIfNeeded(wallets);
+      }
+      const { data, error } = await fetchSupabaseWallets();
+      if (!error && data) {
+        setWallets(data);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSupabaseLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+      const initSupabase = async () => {
+        setSupabaseLoading(true);
+        await seedSupabaseIfNeeded(wallets);
+        await pullFromSupabase();
+      };
+      initSupabase();
+    }
+  }, []);
+
+  // Sync to local fallback key
   useEffect(() => {
     localStorage.setItem('finlux_allocation_wallets', JSON.stringify(wallets));
   }, [wallets]);
 
   // Handle simple toggle pause/activate
-  const toggleWalletStatus = (id: string, currentStatus: 'active' | 'paused' | 'disabled') => {
+  const toggleWalletStatus = async (id: string, currentStatus: 'active' | 'paused' | 'disabled') => {
     const nextStatus = currentStatus === 'active' ? 'paused' : 'active';
-    setWallets(prev => prev.map(w => {
-      if (w.id === id) {
-        return { ...w, status: nextStatus };
-      }
-      return w;
-    }));
+    const target = wallets.find(w => w.id === id);
+    if (!target) return;
+    const updated = { ...target, status: nextStatus };
+    if (isSupabaseConfigured) {
+      setSupabaseLoading(true);
+      await saveSupabaseWallet(updated);
+      await pullFromSupabase();
+    } else {
+      setWallets(prev => prev.map(w => w.id === id ? updated : w));
+    }
   };
 
   // Explicitly set to disabled, paused or active
-  const updateWalletStatus = (id: string, newStatus: Wallet['status']) => {
-    setWallets(prev => prev.map(w => {
-      if (w.id === id) {
-        return { ...w, status: newStatus };
-      }
-      return w;
-    }));
+  const updateWalletStatus = async (id: string, newStatus: Wallet['status']) => {
+    const target = wallets.find(w => w.id === id);
+    if (!target) return;
+    const updated = { ...target, status: newStatus };
+    if (isSupabaseConfigured) {
+      setSupabaseLoading(true);
+      await saveSupabaseWallet(updated);
+      await pullFromSupabase();
+    } else {
+      setWallets(prev => prev.map(w => w.id === id ? updated : w));
+    }
   };
 
-  const deleteWalletItem = (id: string) => {
+  const deleteWalletItem = async (id: string) => {
     if (window.confirm("Are you sure you want to deactivate and remove this mobile wallet completely?")) {
-      setWallets(prev => prev.filter(w => w.id !== id));
+      if (isSupabaseConfigured) {
+        setSupabaseLoading(true);
+        await deleteSupabaseWallet(id);
+        await pullFromSupabase();
+      } else {
+        setWallets(prev => prev.filter(w => w.id !== id));
+      }
     }
   };
 
   // Reset daily statistics (Operational Rollover)
-  const resetDailyMetrics = () => {
+  const resetDailyMetrics = async () => {
     if (window.confirm("Prepare Daily Rollover? This will zero out used today statistics for all active channels.")) {
-      setWallets(prev => prev.map(w => ({
-        ...w,
-        used_today: 0,
-        reserved_today: 0
-      })));
+      if (isSupabaseConfigured) {
+        setSupabaseLoading(true);
+        for (const w of wallets) {
+          await saveSupabaseWallet({ ...w, used_today: 0, reserved_today: 0 });
+        }
+        await pullFromSupabase();
+      } else {
+        setWallets(prev => prev.map(w => ({
+          ...w,
+          used_today: 0,
+          reserved_today: 0
+        })));
+      }
     }
   };
 
   // Create Wallet Submission
-  const handleCreateWallet = (e: React.FormEvent) => {
+  const handleCreateWallet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWalletNum.trim() || !newWalletOwner.trim()) {
       alert("Please provide the wallet telephone digits and custodian legal name.");
@@ -234,7 +295,14 @@ export default function WalletDashboard() {
       priority: Number(newWalletPriority) || 5
     };
 
-    setWallets(prev => [...prev, newW]);
+    if (isSupabaseConfigured) {
+      setSupabaseLoading(true);
+      await saveSupabaseWallet(newW);
+      await pullFromSupabase();
+    } else {
+      setWallets(prev => [...prev, newW]);
+    }
+
     setNewWalletNum('');
     setNewWalletOwner('');
     setNewWalletLabel('');

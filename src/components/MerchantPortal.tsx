@@ -39,7 +39,7 @@ export default function MerchantPortal() {
         { id: '#TRX-99011', method: 'InstaPay', type: 'credit', value: 5000, status: 'Completed', time: '10 mins ago', bg: 'bg-indigo-50' },
         { id: '#TRX-99012', method: 'Vodafone Cash', type: 'debit', value: 850, status: 'Completed', time: '40 mins ago', bg: 'bg-red-50' }
       ]},
-      { id: 'MCH-4412', name: 'OnTarget Egyptian Trade', balance: 78620.00, influx: 240500, fees: 4810, limit: 200000, logoUrl: '', monthlyLimit: 2000000, ledger: [
+      { id: 'MCH-4412', name: 'FinLux Egyptian Trade', balance: 78620.00, influx: 240500, fees: 4810, limit: 200000, logoUrl: '', monthlyLimit: 2000000, ledger: [
         { id: '#TRX-44121', method: 'KNET Gateway', type: 'credit', value: 12000, status: 'Completed', time: '2 hours ago', bg: 'bg-teal-50' }
       ]},
       { id: 'MCH-3041', name: 'Cairo Goods Ltd.', balance: 312000.00, influx: 915800, fees: 18300, limit: 800000, logoUrl: '', monthlyLimit: 8000000, ledger: [

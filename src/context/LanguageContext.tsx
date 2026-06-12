@@ -33,6 +33,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('finlux_lang', language);
     document.documentElement.dir = langDir;
     document.documentElement.lang = language;
+    
+    // Auto-toggle dark mode to maintain absolute sync with Arabic translation mode
+    if (language === 'ar') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [language, langDir]);
 
   const toggleLanguage = () => {

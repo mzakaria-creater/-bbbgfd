@@ -21,10 +21,8 @@ import {
   X,
   Smartphone,
   Sliders,
-  MessageSquareText,
-  ShieldEllipsis,
-  Code2,
-  ShoppingBag
+  Sun,
+  Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LanguageProvider, useTranslation } from './context/LanguageContext';
@@ -43,10 +41,6 @@ import Commissions from './components/Commissions';
 import MerchantPortal from './components/MerchantPortal';
 import WalletAllocationEngine from './components/WalletAllocationEngine';
 import WalletDashboard from './components/WalletDashboard';
-import OrangeSmsReader from './components/OrangeSmsReader';
-import VerificationWorkspace from './components/VerificationWorkspace';
-import DeveloperDocs from './components/DeveloperDocs';
-import Checkout from './components/Checkout';
 
 function BaseLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -67,11 +61,88 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
     return Number(localStorage.getItem('finlux_display_scale')) || 95;
   });
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [remixStyle, setRemixStyle] = useState<'classic' | 'obsidian-velvet' | 'cyber-emerald' | 'glassmorphic-aurora'>(() => {
+    return (localStorage.getItem('finlux_remix_style') as any) || 'classic';
+  });
+
+  const saveRemixStyle = (val: 'classic' | 'obsidian-velvet' | 'cyber-emerald' | 'glassmorphic-aurora') => {
+    setRemixStyle(val);
+    localStorage.setItem('finlux_remix_style', val);
+  };
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const styleVariables = [
+      '--color-surface',
+      '--color-surface-container-lowest',
+      '--color-surface-container-low',
+      '--color-surface-container',
+      '--color-surface-container-high',
+      '--color-surface-container-highest',
+      '--color-primary',
+      '--color-primary-container',
+      '--color-secondary',
+      '--color-secondary-container',
+      '--color-on-surface',
+      '--color-on-surface-variant',
+      '--color-outline',
+      '--color-outline-variant'
+    ];
+    styleVariables.forEach(v => root.style.removeProperty(v));
+
+    if (remixStyle === 'obsidian-velvet') {
+      root.style.setProperty('--color-surface', '#07080f');
+      root.style.setProperty('--color-surface-container-lowest', '#0d0e1a');
+      root.style.setProperty('--color-surface-container-low', '#121424');
+      root.style.setProperty('--color-surface-container', '#181a2f');
+      root.style.setProperty('--color-surface-container-high', '#20223f');
+      root.style.setProperty('--color-surface-container-highest', '#282a4f');
+      root.style.setProperty('--color-primary', '#a78bfa');
+      root.style.setProperty('--color-primary-container', '#6d28d9');
+      root.style.setProperty('--color-secondary', '#fbbf24');
+      root.style.setProperty('--color-secondary-container', '#451a03');
+      root.style.setProperty('--color-on-surface', '#f3f4f6');
+      root.style.setProperty('--color-on-surface-variant', '#9ca3af');
+      root.style.setProperty('--color-outline', '#6b7280');
+      root.style.setProperty('--color-outline-variant', '#374151');
+    } else if (remixStyle === 'cyber-emerald') {
+      root.style.setProperty('--color-surface', '#020617');
+      root.style.setProperty('--color-surface-container-lowest', '#0f172a');
+      root.style.setProperty('--color-surface-container-low', '#1e293b');
+      root.style.setProperty('--color-surface-container', '#273549');
+      root.style.setProperty('--color-surface-container-high', '#334155');
+      root.style.setProperty('--color-surface-container-highest', '#475569');
+      root.style.setProperty('--color-primary', '#10b981');
+      root.style.setProperty('--color-primary-container', '#064e3b');
+      root.style.setProperty('--color-secondary', '#38bdf8');
+      root.style.setProperty('--color-secondary-container', '#0c4a6e');
+      root.style.setProperty('--color-on-surface', '#f0fdf4');
+      root.style.setProperty('--color-on-surface-variant', '#cbd5e1');
+      root.style.setProperty('--color-outline', '#94a3b8');
+      root.style.setProperty('--color-outline-variant', '#475569');
+    } else if (remixStyle === 'glassmorphic-aurora') {
+      root.style.setProperty('--color-surface', '#fafafc');
+      root.style.setProperty('--color-surface-container-lowest', '#ffffff');
+      root.style.setProperty('--color-surface-container-low', '#f3f4f6');
+      root.style.setProperty('--color-surface-container', '#e5e7eb');
+      root.style.setProperty('--color-surface-container-high', '#d1d5db');
+      root.style.setProperty('--color-surface-container-highest', '#9ca3af');
+      root.style.setProperty('--color-primary', '#f43f5e');
+      root.style.setProperty('--color-primary-container', '#ffe4e6');
+      root.style.setProperty('--color-secondary', '#06b6d4');
+      root.style.setProperty('--color-secondary-container', '#ecfeff');
+      root.style.setProperty('--color-on-surface', '#0f172a');
+      root.style.setProperty('--color-on-surface-variant', '#475569');
+      root.style.setProperty('--color-outline', '#94a3b8');
+      root.style.setProperty('--color-outline-variant', '#cbd5e1');
+    }
+  }, [remixStyle]);
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
+      setIsMobile(window.innerWidth < 768);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -106,10 +177,6 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
     { to: '/', label: 'Admin Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { to: '/payment-methods', label: 'Payment Methods', icon: <CreditCard className="w-4 h-4" /> },
     { to: '/wallet-allocation', label: 'Wallet Allocation', icon: <Smartphone className="w-4 h-4" /> },
-    { to: '/orange-sms', label: 'Orange SMS Reader', icon: <MessageSquareText className="w-4 h-4" /> },
-    { to: '/verification', label: 'Verification Workspace', icon: <ShieldEllipsis className="w-4 h-4" /> },
-    { to: '/developers', label: 'Developer API Docs', icon: <Code2 className="w-4 h-4" /> },
-    { to: '/checkout', label: 'OnTarget Checkout', icon: <ShoppingBag className="w-4 h-4" /> },
     { to: '/wallet-dashboard', label: 'Wallet Dashboard', icon: <Sliders className="w-4 h-4" /> },
     { to: '/treasury', label: 'Treasury Hub', icon: <DollarSign className="w-4 h-4" /> },
     { to: '/operator-cockpit', label: 'Operator Cockpit', icon: <History className="w-4 h-4" /> },
@@ -130,11 +197,11 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
 
   if (useMobileLayout) {
     const bottomTabs = [
-      { to: '/', label: 'Dash', icon: <LayoutDashboard className="w-5 h-5 mb-0.5" /> },
-      { to: '/wallet-allocation', label: 'Allocation', icon: <Smartphone className="w-5 h-5 mb-0.5" /> },
-      { to: '/wallet-dashboard', label: 'Control', icon: <Sliders className="w-5 h-5 mb-0.5" /> },
-      { to: '/treasury', label: 'Treasury', icon: <DollarSign className="w-5 h-5 mb-0.5" /> }
-    ];
+      { to: '/', label: 'Dash', permission: 'Admin Dashboard', icon: <LayoutDashboard className="w-5 h-5 mb-0.5" /> },
+      { to: '/wallet-allocation', label: 'Allocation', permission: 'Wallet Allocation', icon: <Smartphone className="w-5 h-5 mb-0.5" /> },
+      { to: '/wallet-dashboard', label: 'Control', permission: 'Wallet Dashboard', icon: <Sliders className="w-5 h-5 mb-0.5" /> },
+      { to: '/treasury', label: 'Treasury', permission: 'Treasury Hub', icon: <DollarSign className="w-5 h-5 mb-0.5" /> }
+    ].filter(tab => checkPermission(tab.permission, 'view'));
 
     const mobileContent = (
       <div 
@@ -146,7 +213,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-white font-extrabold shadow-sm">
               <Sparkles className="w-4 h-4" />
             </div>
-            <span className="text-sm font-black tracking-tight text-primary">OnTarget Go</span>
+            <span className="text-sm font-black tracking-tight text-primary">FinLux Go</span>
             <span className="px-1.5 py-0.5 bg-[#6cf8bb]/20 text-[#006c49] text-[8px] font-black uppercase tracking-wider rounded">
               {t("LIVE")}
             </span>
@@ -155,9 +222,20 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1.5">
             <button 
               onClick={toggleLanguage}
-              className="px-2 py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[9px] font-black uppercase tracking-wider transition-all duration-300 cursor-pointer"
+              title="Toggle English (Light) / العربية (Dark)"
             >
-              {language === 'en' ? 'AR' : 'EN'}
+              {language === 'en' ? (
+                <>
+                  <Sun className="w-3 h-3 text-amber-500" />
+                  <span>EN ☀️</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3 h-3 text-indigo-500" />
+                  <span>عربي 🌙</span>
+                </>
+              )}
             </button>
 
             <button 
@@ -260,7 +338,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
                       <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center text-white font-extrabold transform rotate-2">
                         <Sparkles className="w-4 h-4" />
                       </div>
-                      <span className="text-sm font-black text-primary">OnTarget Options</span>
+                      <span className="text-sm font-black text-primary">FinLux Options</span>
                     </div>
                     <button className="p-1 rounded-full hover:bg-slate-100" onClick={() => setMobileMenuOpen(false)}>
                       <X className="w-5 h-5 text-on-surface" />
@@ -268,24 +346,26 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
                   </div>
 
                   <nav className="space-y-0.5 overflow-y-auto max-h-[72vh] hide-scrollbar">
-                    {navItems.map((item) => {
-                      const active = location.pathname === item.to;
-                      return (
-                        <NavLink 
-                          key={item.to}
-                          to={item.to}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={`flex items-center gap-3 p-3 rounded-xl font-bold text-xs transition-all ${
-                            active 
-                            ? 'bg-white text-[#003ec7] shadow-xs border-l-4 border-primary' 
-                            : 'text-on-surface-variant hover:bg-surface-container-high'
-                          }`}
-                        >
-                          {item.icon}
-                          <span className="truncate">{t(item.label)}</span>
-                        </NavLink>
-                      );
-                    })}
+                    {navItems
+                      .filter((item) => checkPermission(item.label, 'view'))
+                      .map((item) => {
+                        const active = location.pathname === item.to;
+                        return (
+                          <NavLink 
+                            key={item.to}
+                            to={item.to}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={`flex items-center gap-3 p-3 rounded-xl font-bold text-xs transition-all ${
+                              active 
+                              ? 'bg-white text-[#003ec7] shadow-xs border-l-4 border-primary' 
+                              : 'text-on-surface-variant hover:bg-surface-container-high'
+                            }`}
+                          >
+                            {item.icon}
+                            <span className="truncate">{t(item.label)}</span>
+                          </NavLink>
+                        );
+                      })}
                   </nav>
                 </div>
 
@@ -514,6 +594,38 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
+          {/* Remix Theme Selector */}
+          <div className="flex items-center gap-1 bg-slate-800/60 p-0.5 rounded-lg border border-slate-700">
+            <button 
+              onClick={() => saveRemixStyle('classic')}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${remixStyle === 'classic' ? 'bg-[#003ec7] text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Classic defaults"
+            >
+              Classic
+            </button>
+            <button 
+              onClick={() => saveRemixStyle('obsidian-velvet')}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${remixStyle === 'obsidian-velvet' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Obsidian Velvet: Premium deep violet & gold accents"
+            >
+              ✦ Obsidian
+            </button>
+            <button 
+              onClick={() => saveRemixStyle('cyber-emerald')}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${remixStyle === 'cyber-emerald' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Cyber Emerald: Terminal matrix view"
+            >
+              ⚡ Cyber
+            </button>
+            <button 
+              onClick={() => saveRemixStyle('glassmorphic-aurora')}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${remixStyle === 'glassmorphic-aurora' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Aurora Glass: Dynamic vibrant neon palette"
+            >
+              ✨ Aurora
+            </button>
+          </div>
+
           <div className="h-4 w-px bg-slate-700 hidden sm:block" />
 
           {/* Scale Tuner */}
@@ -568,21 +680,48 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-extrabold shadow-md transform rotate-2">
               <Sparkles className="w-4.5 h-4.5" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-primary">OnTarget</span>
+            <span className="text-xl font-bold tracking-tight text-primary">{t("FinLux P2P")}</span>
           </div>
         </div>
 
         {/* Action Widgets */}
         <div className="flex items-center gap-3">
           
-          {/* Dual language picker */}
-          <button 
-            onClick={toggleLanguage}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest transition-colors border border-outline-variant/30 font-bold text-xs"
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>{language === 'en' ? 'العربية' : 'English'}</span>
-          </button>
+          {/* Dual Translation & Dark Mode Theme Switcher */}
+          <div className="flex items-center gap-1.5 bg-surface-container p-1 rounded-full border border-outline-variant/30 relative select-none">
+            <button 
+              onClick={() => {
+                if (language !== 'en') {
+                  toggleLanguage();
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all duration-300 font-bold text-xs cursor-pointer ${
+                language === 'en' 
+                  ? 'bg-white text-primary shadow-xs' 
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+              title="English with Sunlight Workspace"
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-500" />
+              <span>English (☀️)</span>
+            </button>
+            <button 
+              onClick={() => {
+                if (language !== 'ar') {
+                  toggleLanguage();
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all duration-300 font-bold text-xs cursor-pointer ${
+                language === 'ar' 
+                  ? 'bg-indigo-950/60 text-indigo-400 border border-indigo-500/20 shadow-xs' 
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+              title="Arabic with Ambient Dark Mode theme"
+            >
+              <Moon className="w-3.5 h-3.5 text-indigo-400" />
+              <span>العربية (🌙)</span>
+            </button>
+          </div>
 
           <div className="h-6 w-px bg-outline-variant/45 hidden sm:block" />
 
@@ -765,32 +904,30 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="flex-1 space-y-1 overflow-y-auto hide-scrollbar">
-            {navItems.map((item) => {
-              const active = location.pathname === item.to;
-              const isLocked = !checkPermission(item.label, 'view');
-              return (
-                <NavLink 
-                  key={item.to}
-                  to={item.to}
-                  className={`flex items-center justify-between p-3 rounded-lg font-bold text-xs transition-all ${
-                    active 
-                    ? 'bg-[#ffffff] text-[#003ec7] shadow-xs border-r-4 border-primary' 
-                    : isLocked
-                      ? 'text-slate-400 opacity-60 hover:text-slate-500' 
+            {navItems
+              .filter((item) => checkPermission(item.label, 'view'))
+              .map((item) => {
+                const active = location.pathname === item.to;
+                return (
+                  <NavLink 
+                    key={item.to}
+                    to={item.to}
+                    className={`flex items-center justify-between p-3 rounded-lg font-bold text-xs transition-all ${
+                      active 
+                      ? 'bg-[#ffffff] text-[#003ec7] shadow-xs border-r-4 border-primary' 
                       : 'text-on-surface-variant hover:bg-surface-container-high'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    {item.icon}
-                    <span className="flex items-center gap-1.5">
-                      {t(item.label)}
-                      {isLocked && <span className="text-[8px] bg-red-100/80 text-red-700 px-1 py-0.2 rounded font-black uppercase text-center scale-90">Locked</span>}
-                    </span>
-                  </div>
-                  <ChevronRight className={`w-3.5 h-3.5 ${active ? 'text-primary' : 'text-outline-variant'}`} />
-                </NavLink>
-              );
-            })}
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {item.icon}
+                      <span className="flex items-center gap-1.5">
+                        {t(item.label)}
+                      </span>
+                    </div>
+                    <ChevronRight className={`w-3.5 h-3.5 ${active ? 'text-primary' : 'text-outline-variant'}`} />
+                  </NavLink>
+                );
+              })}
           </nav>
 
           <div className="mt-auto pt-4 border-t border-outline-variant/30 space-y-2">
@@ -832,7 +969,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
                       <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-extrabold">
                         <Sparkles className="w-4 h-4" />
                       </div>
-                      <span className="text-lg font-bold text-primary">OnTarget Workspace</span>
+                      <span className="text-lg font-bold text-primary">{t("FinLux Workspace")}</span>
                     </div>
                     <button className="p-1" onClick={() => setMobileMenuOpen(false)}>
                       <X className="w-5 h-5 text-on-surface" />
@@ -840,30 +977,28 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
                   </div>
 
                   <nav className="space-y-1">
-                    {navItems.map((item) => {
-                      const active = location.pathname === item.to;
-                      const isLocked = !checkPermission(item.label, 'view');
-                      return (
-                        <NavLink 
-                          key={item.to}
-                          to={item.to}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={`flex items-center gap-3 p-3.5 rounded-xl font-bold text-xs transition-all ${
-                            active 
-                            ? 'bg-[#ffffff] text-[#003ec7] shadow border-l-4 border-primary' 
-                            : isLocked
-                              ? 'text-slate-400 opacity-60'
+                    {navItems
+                      .filter((item) => checkPermission(item.label, 'view'))
+                      .map((item) => {
+                        const active = location.pathname === item.to;
+                        return (
+                          <NavLink 
+                            key={item.to}
+                            to={item.to}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={`flex items-center gap-3 p-3.5 rounded-xl font-bold text-xs transition-all ${
+                              active 
+                              ? 'bg-[#ffffff] text-[#003ec7] shadow border-l-4 border-primary' 
                               : 'text-on-surface-variant hover:bg-surface-container-high'
-                          }`}
-                        >
-                          {item.icon}
-                          <span className="flex items-center gap-1.5 truncate">
-                            {t(item.label)}
-                            {isLocked && <span className="text-[8px] bg-red-100 text-red-700 px-1 py-0.2 rounded font-black uppercase">Lock</span>}
-                          </span>
-                        </NavLink>
-                      );
-                    })}
+                            }`}
+                          >
+                            {item.icon}
+                            <span className="flex items-center gap-1.5 truncate">
+                              {t(item.label)}
+                            </span>
+                          </NavLink>
+                        );
+                      })}
                   </nav>
                 </div>
 
@@ -892,7 +1027,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
 
       {/* Global Status Bar Footer */}
       <footer className={`w-full ${widthBoundClass} mx-auto px-6 md:px-12 py-6 border-t border-outline-variant/30 flex flex-col md:flex-row items-center justify-between text-xs text-on-surface-variant font-bold gap-4 z-10 bg-transparent`}>
-        <span>© 2026 OnTarget Solutions. London & Cairo Nodes Optimal.</span>
+        <span>{t("© 2026 FinLux P2P Solutions Node Operations. London & Cairo Nodes Optimal.")}</span>
         <div className="flex items-center gap-4">
           <span className="hover:text-primary cursor-pointer" onClick={() => alert(t("Loading documentation index..."))}>{t("ISO documentation")}</span>
           <span>•</span>
@@ -914,10 +1049,6 @@ export default function App() {
               <Route path="/" element={<PermissionGuard pageName="Admin Dashboard"><AdminDashboard /></PermissionGuard>} />
               <Route path="/payment-methods" element={<PermissionGuard pageName="Payment Methods"><PaymentMethods /></PermissionGuard>} />
               <Route path="/wallet-allocation" element={<PermissionGuard pageName="Wallet Allocation"><WalletAllocationEngine /></PermissionGuard>} />
-              <Route path="/orange-sms" element={<PermissionGuard pageName="Orange SMS Reader"><OrangeSmsReader /></PermissionGuard>} />
-              <Route path="/verification" element={<PermissionGuard pageName="Verification Workspace"><VerificationWorkspace /></PermissionGuard>} />
-              <Route path="/developers" element={<PermissionGuard pageName="Developer API Docs"><DeveloperDocs /></PermissionGuard>} />
-              <Route path="/checkout" element={<PermissionGuard pageName="OnTarget Checkout"><Checkout /></PermissionGuard>} />
               <Route path="/wallet-dashboard" element={<PermissionGuard pageName="Wallet Dashboard"><WalletDashboard /></PermissionGuard>} />
               <Route path="/treasury" element={<PermissionGuard pageName="Treasury Hub"><TreasuryHub /></PermissionGuard>} />
               <Route path="/operator-cockpit" element={<PermissionGuard pageName="Operator Cockpit"><OperatorCockpit /></PermissionGuard>} />
