@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LanguageProvider, useTranslation } from './context/LanguageContext';
+import { PermissionsProvider, usePermissions } from './context/PermissionsContext';
+import PermissionGuard from './components/PermissionGuard';
 
 // Import our rich 9 high-fidelity P2P operational screens
 import AdminDashboard from './components/AdminDashboard';
@@ -41,12 +43,13 @@ import WalletDashboard from './components/WalletDashboard';
 function BaseLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { language, langDir, toggleLanguage, t } = useTranslation();
+  const { selectedRole, checkPermission } = usePermissions();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   // 4K Glossy Desktop Landscape states
-  const [viewportWidth, setViewportWidth] = useState<'classic' | 'panoramic' | '4k-ultra'>(() => {
+  const [viewportWidth, setViewportWidth] = useState<'classic' | 'panoramic' | '4k-ultra' | 'mobile'>(() => {
     return (localStorage.getItem('finlux_viewport_width') as any) || '4k-ultra';
   });
   const [glossyLuster, setGlossyLuster] = useState<'glossy' | 'matte'>(() => {
@@ -56,7 +59,20 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
     return Number(localStorage.getItem('finlux_display_scale')) || 95;
   });
 
-  const saveViewportWidth = (val: 'classic' | 'panoramic' | '4k-ultra') => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const useMobileLayout = isMobile || viewportWidth === 'mobile';
+
+  const saveViewportWidth = (val: 'classic' | 'panoramic' | '4k-ultra' | 'mobile') => {
     setViewportWidth(val);
     localStorage.setItem('finlux_viewport_width', val);
   };
@@ -94,9 +110,305 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
 
   // Dynamic width classes based on 4K Landscape Setup
   const widthBoundClass = 
+    isMobile ? 'max-w-full' :
     viewportWidth === 'classic' ? 'max-w-7xl' : 
     viewportWidth === 'panoramic' ? 'max-w-[1550px]' : 
+    viewportWidth === 'mobile' ? 'max-w-[420px]' :
     'max-w-[1880px]';
+
+  if (useMobileLayout) {
+    const bottomTabs = [
+      { to: '/', label: 'Dash', icon: <LayoutDashboard className="w-5 h-5 mb-0.5" /> },
+      { to: '/wallet-allocation', label: 'Allocation', icon: <Smartphone className="w-5 h-5 mb-0.5" /> },
+      { to: '/wallet-dashboard', label: 'Control', icon: <Sliders className="w-5 h-5 mb-0.5" /> },
+      { to: '/treasury', label: 'Treasury', icon: <DollarSign className="w-5 h-5 mb-0.5" /> }
+    ];
+
+    const mobileContent = (
+      <div 
+        dir={langDir} 
+        className="h-full text-[#1a1b1f] flex flex-col font-sans transition-all duration-300 relative bg-[#faf9fe]"
+      >
+        <header className="sticky top-0 z-40 w-full h-14 bg-white/85 backdrop-blur-md border-b border-outline-variant/30 flex items-center justify-between px-4 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-white font-extrabold shadow-sm">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <span className="text-sm font-black tracking-tight text-primary">FinLux Go</span>
+            <span className="px-1.5 py-0.5 bg-[#6cf8bb]/20 text-[#006c49] text-[8px] font-black uppercase tracking-wider rounded">
+              {t("LIVE")}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button 
+              onClick={toggleLanguage}
+              className="px-2 py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              {language === 'en' ? 'AR' : 'EN'}
+            </button>
+
+            <button 
+              onClick={() => {
+                setNotificationsOpen(!notificationsOpen);
+                setProfileOpen(false);
+              }}
+              className="relative p-1.5 text-slate-500 hover:text-primary transition-colors cursor-pointer"
+            >
+              <Bell className="w-4.5 h-4.5" />
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-[#ba1a1a] rounded-full ring-2 ring-white"></span>
+            </button>
+
+            <div 
+              onClick={() => {
+                setProfileOpen(!profileOpen);
+                setNotificationsOpen(false);
+              }}
+              className="w-7 h-7 rounded-full overflow-hidden border border-primary cursor-pointer"
+            >
+              <img 
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxpdqQHuBGY4S81eTh3qg8_ouYgfYnlpGkTdpBna1uGxcB7ZgyV4XTsB90RVKY78z1b83W2HY9mOgmUK7A6cOK67UhAHxU_MslDFkvLyyZUaci1p68mekimlVeG4wruYxMkEdVm2AHPCxZz4-igmq0gyZyVDctmR3E1GeWPuxlkMA_HUUxCBvVVCAYzsd14dF9xvPUHLOOAOX5_ItXB3L37eRNv9BSyGxSbUgUXtFMbisfGkhzlRcbmi91VCupdkvwfgAjhicY6TM" 
+                alt="User" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+        </header>
+
+        <AnimatePresence>
+          {notificationsOpen && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute top-14 left-4 right-4 bg-white border border-outline-variant/50 rounded-2xl shadow-xl z-50 overflow-hidden text-left"
+            >
+              <div className="p-3 bg-slate-50 border-b flex justify-between items-center text-xs font-black">
+                <span>Recent Alerts</span>
+                <button onClick={() => setNotificationsOpen(false)} className="text-[10px] text-primary">Close</button>
+              </div>
+              <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                {notifications.map(n => (
+                  <div key={n.id} className="p-2.5 text-[10px] font-semibold">
+                    <p className="font-bold text-slate-800">{n.title}</p>
+                    <p className="text-slate-500 line-clamp-1">{n.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {profileOpen && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute top-14 left-4 right-4 bg-white border border-outline-variant/40 rounded-2xl shadow-xl z-50 overflow-hidden text-left font-bold text-xs"
+            >
+              <div className="p-3 bg-slate-50 border-b flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full overflow-hidden">
+                  <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxpdqQHuBGY4S81eTh3qg8_ouYgfYnlpGkTdpBna1uGxcB7ZgyV4XTsB90RVKY78z1b83W2HY9mOgmUK7A6cOK67UhAHxU_MslDFkvLyyZUaci1p68mekimlVeG4wruYxMkEdVm2AHPCxZz4-igmq0gyZyVDctmR3E1GeWPuxlkMA_HUUxCBvVVCAYzsd14dF9xvPUHLOOAOX5_ItXB3L37eRNv9BSyGxSbUgUXtFMbisfGkhzlRcbmi91VCupdkvwfgAjhicY6TM" alt="User" className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <h4 className="text-slate-950">Alex Sterling</h4>
+                  <p className="text-[10px] text-primary font-bold">{t(selectedRole)}</p>
+                </div>
+              </div>
+              <div className="p-2 space-y-1">
+                <button onClick={() => { alert(t("Opening settings...")); setProfileOpen(false); }} className="w-full text-left p-2 hover:bg-slate-50 rounded-lg flex items-center gap-2 text-slate-700">
+                  <Settings className="w-3.5 h-3.5" /> <span>{t("Settings")}</span>
+                </button>
+                <button onClick={() => { 
+                  const conf = window.confirm(t("Sign Out?"));
+                  if(conf) { alert(t("Session ended.")); setProfileOpen(false); }
+                }} className="w-full text-left p-2 hover:bg-red-50 text-red-650 rounded-lg flex items-center gap-2">
+                  <ShieldAlert className="w-3.5 h-3.5" /> <span>{t("Sign Out")}</span>
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-50 bg-[#0e0c24]/40 backdrop-blur-xs" onClick={() => setMobileMenuOpen(false)} />
+              <motion.aside 
+                initial={{ x: langDir === 'rtl' ? '100%' : '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: langDir === 'rtl' ? '100%' : '-100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                className="fixed left-0 rtl:left-auto rtl:right-0 top-0 bottom-0 max-w-xs w-[80%] bg-[#faf9fe] h-screen border-r rtl:border-r-0 rtl:border-l border-outline-variant z-50 p-5 flex flex-col justify-between text-left rtl:text-right"
+              >
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center text-white font-extrabold transform rotate-2">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <span className="text-sm font-black text-primary">FinLux Options</span>
+                    </div>
+                    <button className="p-1 rounded-full hover:bg-slate-100" onClick={() => setMobileMenuOpen(false)}>
+                      <X className="w-5 h-5 text-on-surface" />
+                    </button>
+                  </div>
+
+                  <nav className="space-y-0.5 overflow-y-auto max-h-[72vh] hide-scrollbar">
+                    {navItems.map((item) => {
+                      const active = location.pathname === item.to;
+                      return (
+                        <NavLink 
+                          key={item.to}
+                          to={item.to}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={`flex items-center gap-3 p-3 rounded-xl font-bold text-xs transition-all ${
+                            active 
+                            ? 'bg-white text-[#003ec7] shadow-xs border-l-4 border-primary' 
+                            : 'text-on-surface-variant hover:bg-surface-container-high'
+                          }`}
+                        >
+                          {item.icon}
+                          <span className="truncate">{t(item.label)}</span>
+                        </NavLink>
+                      );
+                    })}
+                  </nav>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    alert(t("Emergency Ledger Block Activated."));
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-[#ffdad6] text-[#ba1a1a] py-3.5 rounded-xl text-xs font-black uppercase tracking-wider"
+                >
+                  🔒 {t("Emergency Lock")}
+                </button>
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
+
+        <main className="flex-1 overflow-y-auto p-4 pb-26 bg-[#faf9fe]">
+          <AnimatePresence mode="wait">
+            {children}
+          </AnimatePresence>
+        </main>
+
+        <div className="absolute bottom-4 left-4 right-4 h-16 bg-white/95 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg flex justify-around items-center px-1 z-40 select-none">
+          {bottomTabs.map((tab) => {
+            const active = location.pathname === tab.to;
+            return (
+              <NavLink
+                key={tab.to}
+                to={tab.to}
+                className={`flex flex-col items-center justify-center py-1 rounded-xl transition-all w-16 relative ${
+                  active ? 'text-primary scale-110 font-extrabold' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {tab.icon}
+                <span className="text-[9px] font-bold tracking-tight mt-0.5">{t(tab.label)}</span>
+                {active && (
+                  <motion.div 
+                    layoutId="activeTabIndicator" 
+                    className="absolute -bottom-1 w-4 h-1 bg-primary rounded-full"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+              </NavLink>
+            );
+          })}
+
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className={`flex flex-col items-center justify-center py-1 rounded-xl transition-all w-16 text-slate-400 hover:text-slate-650 ${
+              mobileMenuOpen ? 'text-primary scale-110 font-bold' : ''
+            }`}
+          >
+            <Menu className="w-5 h-5 mb-0.5" />
+            <span className="text-[9px] font-bold tracking-tight">{t("More")}</span>
+          </button>
+        </div>
+
+      </div>
+    );
+
+    if (isMobile) {
+      return (
+        <div className="w-full h-screen overflow-hidden flex flex-col bg-[#faf9fe]">
+          {mobileContent}
+        </div>
+      );
+    } else {
+      return (
+        <div 
+          dir={langDir}
+          className={`min-h-screen text-[#1a1b1f] flex flex-col font-sans transition-all duration-300 relative ${
+            glossyLuster === 'glossy' 
+              ? 'bg-gradient-to-br from-[#f6f5fa] via-[#faf9fe] to-[#f0eef7]' 
+              : 'bg-[#faf9fe]'
+          }`}
+        >
+          <div className="w-full bg-[#101115] text-slate-300 py-1.5 px-6 text-[11px] font-mono flex justify-between items-center border-b border-[#20222a] z-50">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-400"></span>
+              </span>
+              <span className="font-extrabold uppercase text-slate-200">📱 Mobile App Simulator Mode</span>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => saveViewportWidth('4k-ultra')}
+                className="px-2.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded text-[10px] font-extrabold transition-all cursor-pointer"
+              >
+                🖥️ Exit Simulator (Widescreen)
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col justify-center items-center py-8 px-4 z-10 relative">
+            <div className="absolute top-[20%] left-[30%] w-[350px] h-[350px] rounded-full bg-indigo-500/10 blur-[80px]" />
+            <div className="absolute bottom-[20%] right-[30%] w-[350px] h-[350px] rounded-full bg-emerald-500/5 blur-[80px]" />
+
+            <div className="w-full max-w-[390px] h-[812px] bg-[#18181f] rounded-[3.5rem] p-3 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] relative border border-slate-700/50 flex flex-col ring-4 ring-neutral-800/10">
+              
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-5 bg-[#0a0a0f] rounded-2xl z-50 flex items-center justify-center">
+                <div className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-800 absolute left-3" />
+                <div className="w-10 h-1 bg-slate-800 rounded-full" />
+              </div>
+
+              <div className="w-full h-8 bg-white flex items-end justify-between px-6 pb-1 text-[10px] font-bold text-[#1a1b1f] z-40 select-none rounded-t-[2.7rem] border-b border-slate-50">
+                <span>9:41</span>
+                <div className="flex items-center gap-1">
+                  <div className="flex items-end gap-0.5 h-2">
+                    <div className="w-0.5 h-1 bg-slate-950 rounded-xs" />
+                    <div className="w-0.5 h-1.5 bg-slate-950 rounded-xs" />
+                    <div className="w-0.5 h-2 bg-slate-950 rounded-xs" />
+                  </div>
+                  <span className="text-[9px]">5G</span>
+                  <div className="w-5 h-2.5 border border-slate-950 rounded-2xs p-0.3 flex items-center">
+                    <div className="h-full w-full bg-[#0d593a] rounded-3xs" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-grow rounded-[2.7rem] overflow-hidden bg-[#faf9fe] relative flex flex-col border border-slate-200">
+                <div className="absolute inset-0 overflow-hidden">
+                  {mobileContent}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // 4K Glossy Desktop Landscape states
 
   return (
     <div 
@@ -161,6 +473,13 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
               title="Ultra 4K 1880px Canvas"
             >
               4K Ultra-Wide
+            </button>
+            <button 
+              onClick={() => saveViewportWidth('mobile')}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${viewportWidth === 'mobile' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Interactive Smartphone Simulator Mode"
+            >
+              📱 Mobile App
             </button>
           </div>
 
@@ -361,7 +680,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="overflow-hidden">
                       <p className="text-xs font-extrabold text-on-surface truncate">{t("Alex Sterling")}</p>
-                      <p className="text-[10px] text-on-surface-variant truncate font-semibold">{t("Global Administrator")}</p>
+                      <p className="text-[10px] text-primary truncate font-bold">{t(selectedRole)}</p>
                     </div>
                   </div>
 
@@ -436,6 +755,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
           <nav className="flex-1 space-y-1 overflow-y-auto hide-scrollbar">
             {navItems.map((item) => {
               const active = location.pathname === item.to;
+              const isLocked = !checkPermission(item.label, 'view');
               return (
                 <NavLink 
                   key={item.to}
@@ -443,12 +763,17 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
                   className={`flex items-center justify-between p-3 rounded-lg font-bold text-xs transition-all ${
                     active 
                     ? 'bg-[#ffffff] text-[#003ec7] shadow-xs border-r-4 border-primary' 
-                    : 'text-on-surface-variant hover:bg-surface-container-high'
+                    : isLocked
+                      ? 'text-slate-400 opacity-60 hover:text-slate-500' 
+                      : 'text-on-surface-variant hover:bg-surface-container-high'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     {item.icon}
-                    <span>{t(item.label)}</span>
+                    <span className="flex items-center gap-1.5">
+                      {t(item.label)}
+                      {isLocked && <span className="text-[8px] bg-red-100/80 text-red-700 px-1 py-0.2 rounded font-black uppercase text-center scale-90">Locked</span>}
+                    </span>
                   </div>
                   <ChevronRight className={`w-3.5 h-3.5 ${active ? 'text-primary' : 'text-outline-variant'}`} />
                 </NavLink>
@@ -505,6 +830,7 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
                   <nav className="space-y-1">
                     {navItems.map((item) => {
                       const active = location.pathname === item.to;
+                      const isLocked = !checkPermission(item.label, 'view');
                       return (
                         <NavLink 
                           key={item.to}
@@ -513,11 +839,16 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
                           className={`flex items-center gap-3 p-3.5 rounded-xl font-bold text-xs transition-all ${
                             active 
                             ? 'bg-[#ffffff] text-[#003ec7] shadow border-l-4 border-primary' 
-                            : 'text-on-surface-variant hover:bg-surface-container-high'
+                            : isLocked
+                              ? 'text-slate-400 opacity-60'
+                              : 'text-on-surface-variant hover:bg-surface-container-high'
                           }`}
                         >
                           {item.icon}
-                          <span>{t(item.label)}</span>
+                          <span className="flex items-center gap-1.5 truncate">
+                            {t(item.label)}
+                            {isLocked && <span className="text-[8px] bg-red-100 text-red-700 px-1 py-0.2 rounded font-black uppercase">Lock</span>}
+                          </span>
                         </NavLink>
                       );
                     })}
@@ -564,23 +895,25 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <LanguageProvider>
-      <Router>
-        <BaseLayout>
-          <Routes>
-            <Route path="/" element={<AdminDashboard />} />
-            <Route path="/payment-methods" element={<PaymentMethods />} />
-            <Route path="/wallet-allocation" element={<WalletAllocationEngine />} />
-            <Route path="/wallet-dashboard" element={<WalletDashboard />} />
-            <Route path="/treasury" element={<TreasuryHub />} />
-            <Route path="/operator-cockpit" element={<OperatorCockpit />} />
-            <Route path="/local-depositors" element={<LocalDepositors />} />
-            <Route path="/disputes" element={<Disputes />} />
-            <Route path="/rbac" element={<RBACStudio />} />
-            <Route path="/commissions" element={<Commissions />} />
-            <Route path="/merchant-portal" element={<MerchantPortal />} />
-          </Routes>
-        </BaseLayout>
-      </Router>
+      <PermissionsProvider>
+        <Router>
+          <BaseLayout>
+            <Routes>
+              <Route path="/" element={<PermissionGuard pageName="Admin Dashboard"><AdminDashboard /></PermissionGuard>} />
+              <Route path="/payment-methods" element={<PermissionGuard pageName="Payment Methods"><PaymentMethods /></PermissionGuard>} />
+              <Route path="/wallet-allocation" element={<PermissionGuard pageName="Wallet Allocation"><WalletAllocationEngine /></PermissionGuard>} />
+              <Route path="/wallet-dashboard" element={<PermissionGuard pageName="Wallet Dashboard"><WalletDashboard /></PermissionGuard>} />
+              <Route path="/treasury" element={<PermissionGuard pageName="Treasury Hub"><TreasuryHub /></PermissionGuard>} />
+              <Route path="/operator-cockpit" element={<PermissionGuard pageName="Operator Cockpit"><OperatorCockpit /></PermissionGuard>} />
+              <Route path="/local-depositors" element={<PermissionGuard pageName="Local Depositors"><LocalDepositors /></PermissionGuard>} />
+              <Route path="/disputes" element={<PermissionGuard pageName="Complaints / Disputes"><Disputes /></PermissionGuard>} />
+              <Route path="/rbac" element={<PermissionGuard pageName="RBAC perms Studio"><RBACStudio /></PermissionGuard>} />
+              <Route path="/commissions" element={<PermissionGuard pageName="Commission Engine"><Commissions /></PermissionGuard>} />
+              <Route path="/merchant-portal" element={<PermissionGuard pageName="Merchant Dashboard"><MerchantPortal /></PermissionGuard>} />
+            </Routes>
+          </BaseLayout>
+        </Router>
+      </PermissionsProvider>
     </LanguageProvider>
   );
 }
