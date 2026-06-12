@@ -22,12 +22,51 @@ import {
   Smartphone,
   Sliders,
   Sun,
-  Moon
+  Moon,
+  Palette,
+  Copy,
+  Check,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LanguageProvider, useTranslation } from './context/LanguageContext';
 import { PermissionsProvider, usePermissions } from './context/PermissionsContext';
 import PermissionGuard from './components/PermissionGuard';
+
+// Direct color processing functions for procedural design variables
+function isHexDark(hex: string): boolean {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return true;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.55;
+}
+
+function lightenColor(col: string, amt: number): string {
+  let usePound = false;
+  if (col[0] === "#") {
+    col = col.slice(1);
+    usePound = true;
+  }
+  const num = parseInt(col, 16);
+  if (isNaN(num)) return usePound ? "#" + col : col;
+  let r = (num >> 16) + amt;
+  if (r > 255) r = 255;
+  else if (r < 0) r = 0;
+  let g = ((num >> 8) & 0x00ff) + amt;
+  if (g > 255) g = 255;
+  else if (g < 0) g = 0;
+  let b = (num & 0x0000ff) + amt;
+  if (b > 255) b = 255;
+  else if (b < 0) b = 0;
+  return (usePound ? "#" : "") + (b | (g << 8) | (r << 16)).toString(16).padStart(6, '0');
+}
+
+function darkenColor(col: string, amt: number): string {
+  return lightenColor(col, -amt);
+}
 
 // Import our rich 9 high-fidelity P2P operational screens
 import AdminDashboard from './components/AdminDashboard';
@@ -49,6 +88,8 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [themeCustomizerOpen, setThemeCustomizerOpen] = useState(false);
+  const [themeExportVisible, setThemeExportVisible] = useState(false);
 
   // 4K Glossy Desktop Landscape states
   const [viewportWidth, setViewportWidth] = useState<'classic' | 'panoramic' | '4k-ultra' | 'mobile'>(() => {
@@ -61,13 +102,30 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
     return Number(localStorage.getItem('finlux_display_scale')) || 95;
   });
 
-  const [remixStyle, setRemixStyle] = useState<'classic' | 'obsidian-velvet' | 'cyber-emerald' | 'glassmorphic-aurora'>(() => {
+  const [remixStyle, setRemixStyle] = useState<'classic' | 'obsidian-velvet' | 'cyber-emerald' | 'glassmorphic-aurora' | 'custom'>(() => {
     return (localStorage.getItem('finlux_remix_style') as any) || 'classic';
   });
 
-  const saveRemixStyle = (val: 'classic' | 'obsidian-velvet' | 'cyber-emerald' | 'glassmorphic-aurora') => {
+  const [customPrimary, setCustomPrimary] = useState(() => localStorage.getItem('finlux_custom_primary') || '#6366f1');
+  const [customSecondary, setCustomSecondary] = useState(() => localStorage.getItem('finlux_custom_secondary') || '#14b8a6');
+  const [customSurface, setCustomSurface] = useState(() => localStorage.getItem('finlux_custom_surface') || '#0b0f19');
+  const [customOnSurface, setCustomOnSurface] = useState(() => localStorage.getItem('finlux_custom_on_surface') || '#f1f5f9');
+  const [customRadius, setCustomRadius] = useState(() => localStorage.getItem('finlux_custom_radius') || '1rem');
+  const [customFont, setCustomFont] = useState(() => localStorage.getItem('finlux_custom_font') || 'inter');
+
+  const saveRemixStyle = (val: 'classic' | 'obsidian-velvet' | 'cyber-emerald' | 'glassmorphic-aurora' | 'custom') => {
     setRemixStyle(val);
     localStorage.setItem('finlux_remix_style', val);
+  };
+
+  const saveCustomThemeParam = (paramName: string, val: string) => {
+    localStorage.setItem(`finlux_custom_${paramName}`, val);
+    if (paramName === 'primary') setCustomPrimary(val);
+    else if (paramName === 'secondary') setCustomSecondary(val);
+    else if (paramName === 'surface') setCustomSurface(val);
+    else if (paramName === 'on_surface') setCustomOnSurface(val);
+    else if (paramName === 'radius') setCustomRadius(val);
+    else if (paramName === 'font') setCustomFont(val);
   };
 
   useEffect(() => {
@@ -86,8 +144,11 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
       '--color-on-surface',
       '--color-on-surface-variant',
       '--color-outline',
-      '--color-outline-variant'
+      '--color-outline-variant',
+      '--radius-xl',
+      '--font-sans'
     ];
+    // Reset any custom styles
     styleVariables.forEach(v => root.style.removeProperty(v));
 
     if (remixStyle === 'obsidian-velvet') {
@@ -105,13 +166,15 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
       root.style.setProperty('--color-on-surface-variant', '#9ca3af');
       root.style.setProperty('--color-outline', '#6b7280');
       root.style.setProperty('--color-outline-variant', '#374151');
+      root.style.setProperty('--radius-xl', '1rem');
+      root.style.setProperty('--font-sans', '"Work Sans", sans-serif');
     } else if (remixStyle === 'cyber-emerald') {
       root.style.setProperty('--color-surface', '#020617');
-      root.style.setProperty('--color-surface-container-lowest', '#0f172a');
-      root.style.setProperty('--color-surface-container-low', '#1e293b');
-      root.style.setProperty('--color-surface-container', '#273549');
-      root.style.setProperty('--color-surface-container-high', '#334155');
-      root.style.setProperty('--color-surface-container-highest', '#475569');
+      root.style.setProperty('--color-surface-container-lowest', '#040b1e');
+      root.style.setProperty('--color-surface-container-low', '#0a122c');
+      root.style.setProperty('--color-surface-container', '#0f172a');
+      root.style.setProperty('--color-surface-container-high', '#1e293b');
+      root.style.setProperty('--color-surface-container-highest', '#334155');
       root.style.setProperty('--color-primary', '#10b981');
       root.style.setProperty('--color-primary-container', '#064e3b');
       root.style.setProperty('--color-secondary', '#38bdf8');
@@ -120,6 +183,8 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
       root.style.setProperty('--color-on-surface-variant', '#cbd5e1');
       root.style.setProperty('--color-outline', '#94a3b8');
       root.style.setProperty('--color-outline-variant', '#475569');
+      root.style.setProperty('--radius-xl', '0.2rem');
+      root.style.setProperty('--font-sans', '"JetBrains Mono", monospace');
     } else if (remixStyle === 'glassmorphic-aurora') {
       root.style.setProperty('--color-surface', '#fafafc');
       root.style.setProperty('--color-surface-container-lowest', '#ffffff');
@@ -135,8 +200,72 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
       root.style.setProperty('--color-on-surface-variant', '#475569');
       root.style.setProperty('--color-outline', '#94a3b8');
       root.style.setProperty('--color-outline-variant', '#cbd5e1');
+      root.style.setProperty('--radius-xl', '1.75rem');
+      root.style.setProperty('--font-sans', '"Work Sans", sans-serif');
+    } else if (remixStyle === 'custom') {
+      const isDark = isHexDark(customSurface);
+      
+      const lowestVal = isDark ? lightenColor(customSurface, 6) : '#ffffff';
+      const lowVal = isDark ? lightenColor(customSurface, 12) : darkenColor(customSurface, 3);
+      const containerVal = isDark ? lightenColor(customSurface, 18) : darkenColor(customSurface, 6);
+      const highVal = isDark ? lightenColor(customSurface, 24) : darkenColor(customSurface, 12);
+      const highestVal = isDark ? lightenColor(customSurface, 30) : darkenColor(customSurface, 18);
+
+      root.style.setProperty('--color-surface', customSurface);
+      root.style.setProperty('--color-surface-container-lowest', lowestVal);
+      root.style.setProperty('--color-surface-container-low', lowVal);
+      root.style.setProperty('--color-surface-container', containerVal);
+      root.style.setProperty('--color-surface-container-high', highVal);
+      root.style.setProperty('--color-surface-container-highest', highestVal);
+      root.style.setProperty('--color-primary', customPrimary);
+      root.style.setProperty('--color-primary-container', isDark ? darkenColor(customPrimary, 35) : lightenColor(customPrimary, 35));
+      root.style.setProperty('--color-secondary', customSecondary);
+      root.style.setProperty('--color-secondary-container', isDark ? darkenColor(customSecondary, 35) : lightenColor(customSecondary, 35));
+      root.style.setProperty('--color-on-surface', customOnSurface);
+      root.style.setProperty('--color-on-surface-variant', isDark ? '#cbd5e1' : '#475569');
+      root.style.setProperty('--color-outline', isDark ? '#64748b' : '#94a3b8');
+      root.style.setProperty('--color-outline-variant', isDark ? '#334155' : '#cbd5e1');
+      root.style.setProperty('--radius-xl', customRadius);
+
+      if (customFont === 'jetbrains') {
+        root.style.setProperty('--font-sans', '"JetBrains Mono", monospace');
+      } else if (customFont === 'inter') {
+        root.style.setProperty('--font-sans', '"Inter", sans-serif');
+      } else if (customFont === 'serif-display') {
+        root.style.setProperty('--font-sans', '"Playfair Display", Georgia, serif');
+      } else {
+        root.style.setProperty('--font-sans', '"Work Sans", sans-serif');
+      }
     }
-  }, [remixStyle]);
+  }, [remixStyle, customPrimary, customSecondary, customSurface, customOnSurface, customRadius, customFont]);
+
+  const randomizeTheme = () => {
+    const isDark = Math.random() > 0.45;
+    // Cohesive premium layout selections
+    const primaries = ['#10b981', '#6366f1', '#f43f5e', '#06b6d4', '#f97316', '#8b5cf6', '#3b82f6', '#ec4899', '#14b8a6', '#e11d48'];
+    const secondaries = ['#fbbf24', '#38bdf8', '#34d399', '#f472b6', '#a78bfa', '#fb7185', '#22c55e', '#f59e0b', '#d946ef'];
+    const darkSurfaces = ['#090d16', '#030712', '#050a14', '#0f0f19', '#111827', '#0e0b16', '#1c1917'];
+    const lightSurfaces = ['#faf9fe', '#f8fafc', '#f5f7fa', '#f0f4f8', '#fafafc', '#fefdfb'];
+    
+    const nextPrimary = primaries[Math.floor(Math.random() * primaries.length)];
+    const nextSecondary = secondaries[Math.floor(Math.random() * secondaries.length)];
+    const nextSurface = isDark 
+      ? darkSurfaces[Math.floor(Math.random() * darkSurfaces.length)]
+      : lightSurfaces[Math.floor(Math.random() * lightSurfaces.length)];
+    const nextOnSurface = isDark ? '#f1f5f9' : '#0f172a';
+    const radii = ['0px', '0.4rem', '1rem', '1.75rem'];
+    const nextRadius = radii[Math.floor(Math.random() * radii.length)];
+    const fonts = ['work-sans', 'inter', 'jetbrains', 'serif-display'];
+    const nextFont = fonts[Math.floor(Math.random() * fonts.length)];
+
+    saveRemixStyle('custom');
+    saveCustomThemeParam('primary', nextPrimary);
+    saveCustomThemeParam('secondary', nextSecondary);
+    saveCustomThemeParam('surface', nextSurface);
+    saveCustomThemeParam('on_surface', nextOnSurface);
+    saveCustomThemeParam('radius', nextRadius);
+    saveCustomThemeParam('font', nextFont);
+  };
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -624,7 +753,25 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
             >
               ✨ Aurora
             </button>
+            <button 
+              onClick={() => saveRemixStyle('custom')}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${remixStyle === 'custom' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Custom procedurally-generated interactive remix"
+            >
+              🎨 Custom
+            </button>
           </div>
+
+          <button 
+            onClick={() => setThemeCustomizerOpen(!themeCustomizerOpen)}
+            className={`px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 transition-all border border-slate-700 cursor-pointer active:scale-95 ${
+              themeCustomizerOpen ? 'ring-2 ring-primary border-primary' : ''
+            }`}
+            title="Open Interactive Theme Builder & Realtime Color Palette Studio"
+          >
+            <Sliders className="w-3 h-3 text-emerald-400" />
+            <span>🔧 REMIX STUDIO</span>
+          </button>
 
           <div className="h-4 w-px bg-slate-700 hidden sm:block" />
 
@@ -651,6 +798,301 @@ function BaseLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </div>
+
+      {/* 🛠️ FINLUX MASTER DESIGN REMIX COCKPIT */}
+      <AnimatePresence>
+        {themeCustomizerOpen && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="w-full bg-[#111219] border-b border-[#2d2f3c] text-slate-200 p-4 md:px-8 z-40 relative text-xs font-sans overflow-hidden select-none"
+            id="finlux-remix-studio-panel"
+          >
+            {/* Ambient indicator lights */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
+
+            <div className="max-w-[1880px] mx-auto flex flex-col xl:flex-row gap-6 justify-between items-stretch">
+              
+              {/* Preset Column */}
+              <div className="flex-1 space-y-3 min-w-[280px]">
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                  <Palette className="w-3.5 h-3.5 text-emerald-400 animate-spin" style={{ animationDuration: '4s' }} />
+                  <span>Choose Theme Base Preset</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={() => saveRemixStyle('classic')}
+                    className={`p-2.5 rounded-xl border text-left flex items-center justify-between font-bold transition-all ${
+                      remixStyle === 'classic' 
+                        ? 'bg-slate-800 border-indigo-500 text-white shadow-md' 
+                        : 'bg-slate-900/40 border-slate-700/60 text-slate-300 hover:bg-slate-900/90'
+                    }`}
+                  >
+                    <span>🏛️ Classic Default</span>
+                    {remixStyle === 'classic' && <Check className="w-3.5 h-3.5 text-emerald-450" />}
+                  </button>
+                  <button 
+                    onClick={() => saveRemixStyle('obsidian-velvet')}
+                    className={`p-2.5 rounded-xl border text-left flex items-center justify-between font-bold transition-all ${
+                      remixStyle === 'obsidian-velvet' 
+                        ? 'bg-indigo-950/60 border-indigo-550 text-white shadow-md' 
+                        : 'bg-slate-900/40 border-slate-700/60 text-slate-300 hover:bg-slate-900/90'
+                    }`}
+                  >
+                    <span>✦ Obsidian Velvet</span>
+                    {remixStyle === 'obsidian-velvet' && <Check className="w-3.5 h-3.5 text-indigo-400" />}
+                  </button>
+                  <button 
+                    onClick={() => saveRemixStyle('cyber-emerald')}
+                    className={`p-2.5 rounded-xl border text-left flex items-center justify-between font-bold transition-all ${
+                      remixStyle === 'cyber-emerald' 
+                        ? 'bg-emerald-950/60 border-emerald-555 text-white shadow-md' 
+                        : 'bg-slate-900/40 border-slate-700/60 text-slate-300 hover:bg-slate-900/90'
+                    }`}
+                  >
+                    <span>⚡ Cyber Emerald</span>
+                    {remixStyle === 'cyber-emerald' && <Check className="w-3.5 h-3.5 text-emerald-450" />}
+                  </button>
+                  <button 
+                    onClick={() => saveRemixStyle('glassmorphic-aurora')}
+                    className={`p-2.5 rounded-xl border text-left flex items-center justify-between font-bold transition-all ${
+                      remixStyle === 'glassmorphic-aurora' 
+                        ? 'bg-rose-950/40 border-rose-555 text-white shadow-md' 
+                        : 'bg-slate-900/40 border-slate-700/60 text-slate-300 hover:bg-slate-900/90'
+                    }`}
+                  >
+                    <span>✨ Glass Aurora</span>
+                    {remixStyle === 'glassmorphic-aurora' && <Check className="w-3.5 h-3.5 text-rose-400" />}
+                  </button>
+                </div>
+
+                <div className="pt-1 flex gap-2">
+                  <button 
+                    onClick={randomizeTheme}
+                    className="flex-1 py-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-650 hover:from-emerald-400 hover:to-indigo-550 text-white rounded-xl text-[10.5px] font-extrabold transition-all hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    <span>🎲 Procedural Randomizer</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      saveRemixStyle('custom');
+                      saveCustomThemeParam('primary', '#6366f1');
+                      saveCustomThemeParam('secondary', '#14b8a6');
+                      saveCustomThemeParam('surface', '#090d16');
+                      saveCustomThemeParam('on_surface', '#f1f5f9');
+                      saveCustomThemeParam('radius', '1rem');
+                      saveCustomThemeParam('font', 'inter');
+                    }}
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition-colors"
+                    title="Reset to Custom Default"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Custom Sliders Column (Enabled when Custom Remix mode active) */}
+              <div className={`flex-[1.8] space-y-3 p-4 rounded-2xl border transition-all duration-300 ${
+                remixStyle === 'custom' 
+                  ? 'bg-slate-900/90 border-[#3d4154]/80' 
+                  : 'bg-slate-900/25 border-slate-800/40 opacity-40 hover:opacity-60 cursor-pointer'
+              }`}
+                onClick={() => { if (remixStyle !== 'custom') saveRemixStyle('custom'); }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-widest text-[#cbd5e1] font-extrabold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    Custom Color-Remix Deck {remixStyle !== 'custom' ? '(Click to unlock custom variables)' : '(Live Variables Override)'}
+                  </span>
+                  {remixStyle !== 'custom' && (
+                    <span className="text-[9px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                      INACTIVE - CLICK TO EDIT
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Primary Color Picker */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 block">Primary Accent</label>
+                    <div className="flex items-center gap-2 bg-slate-850 p-1 rounded-xl border border-slate-700/50">
+                      <input 
+                        type="color" 
+                        value={customPrimary} 
+                        onChange={(e) => saveCustomThemeParam('primary', e.target.value)}
+                        className="w-5 h-5 rounded-md cursor-pointer border-0 bg-transparent p-0"
+                        disabled={remixStyle !== 'custom'}
+                      />
+                      <input 
+                        type="text" 
+                        value={customPrimary} 
+                        onChange={(e) => saveCustomThemeParam('primary', e.target.value)}
+                        className="bg-transparent text-[10px] font-mono text-white w-full border-none focus:ring-0 p-0 uppercase"
+                        disabled={remixStyle !== 'custom'}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Secondary Color Picker */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 block">Contrast Accent</label>
+                    <div className="flex items-center gap-2 bg-slate-855 p-1 rounded-xl border border-slate-700/50">
+                      <input 
+                        type="color" 
+                        value={customSecondary} 
+                        onChange={(e) => saveCustomThemeParam('secondary', e.target.value)}
+                        className="w-5 h-5 rounded-md cursor-pointer border-0 bg-transparent p-0"
+                        disabled={remixStyle !== 'custom'}
+                      />
+                      <input 
+                        type="text" 
+                        value={customSecondary} 
+                        onChange={(e) => saveCustomThemeParam('secondary', e.target.value)}
+                        className="bg-transparent text-[10px] font-mono text-white w-full border-none focus:ring-0 p-0 uppercase"
+                        disabled={remixStyle !== 'custom'}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Surface Color Picker */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 block">Canvas Background</label>
+                    <div className="flex items-center gap-2 bg-slate-850 p-1 rounded-xl border border-slate-700/50">
+                      <input 
+                        type="color" 
+                        value={customSurface} 
+                        onChange={(e) => saveCustomThemeParam('surface', e.target.value)}
+                        className="w-5 h-5 rounded-md cursor-pointer border-0 bg-transparent p-0"
+                        disabled={remixStyle !== 'custom'}
+                      />
+                      <input 
+                        type="text" 
+                        value={customSurface} 
+                        onChange={(e) => saveCustomThemeParam('surface', e.target.value)}
+                        className="bg-transparent text-[10px] font-mono text-white w-full border-none focus:ring-0 p-0 uppercase"
+                        disabled={remixStyle !== 'custom'}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Text Color Picker */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 block">Body On-Surface Text</label>
+                    <div className="flex items-center gap-2 bg-slate-855 p-1 rounded-xl border border-slate-700/50">
+                      <input 
+                        type="color" 
+                        value={customOnSurface} 
+                        onChange={(e) => saveCustomThemeParam('on_surface', e.target.value)}
+                        className="w-5 h-5 rounded-md cursor-pointer border-0 bg-transparent p-0"
+                        disabled={remixStyle !== 'custom'}
+                      />
+                      <input 
+                        type="text" 
+                        value={customOnSurface} 
+                        onChange={(e) => saveCustomThemeParam('on_surface', e.target.value)}
+                        className="bg-transparent text-[10px] font-mono text-white w-full border-none focus:ring-0 p-0 uppercase"
+                        disabled={remixStyle !== 'custom'}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  {/* Border Radius */}
+                  <div className="space-y-1.5">
+                    <label className="text-[9.5px] font-bold text-slate-450 block">Border Radius Theme</label>
+                    <div className="flex gap-1.5 bg-slate-800/40 p-0.5 rounded-xl border border-slate-700/55">
+                      {[
+                        { label: 'Brutalist ⊞', val: '0px' },
+                        { label: 'Standard ⧉', val: '0.4rem' },
+                        { label: 'Curved ◯', val: '1rem' },
+                        { label: 'Organic ⚛', val: '1.75rem' }
+                      ].map((item) => (
+                        <button 
+                          key={item.val}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            saveCustomThemeParam('radius', item.val);
+                          }}
+                          className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-all ${
+                            customRadius === item.val ? 'bg-slate-750 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                          disabled={remixStyle !== 'custom'}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Dynamic Font selection */}
+                  <div className="space-y-1.5">
+                    <label className="text-[9.5px] font-bold text-slate-450 block">Font Pairing Set</label>
+                    <div className="flex gap-1.5 bg-slate-800/40 p-0.5 rounded-xl border border-slate-700/55">
+                      {[
+                        { label: 'Inter Minimal', val: 'inter' },
+                        { label: 'Work Sans Pres', val: 'work-sans' },
+                        { label: 'Mono Technical', val: 'jetbrains' },
+                        { label: 'Elegant Display', val: 'serif-display' }
+                      ].map((item) => (
+                        <button 
+                          key={item.val}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            saveCustomThemeParam('font', item.val);
+                          }}
+                          className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-all ${
+                            customFont === item.val ? 'bg-slate-750 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                          disabled={remixStyle !== 'custom'}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Design token exporter */}
+              <div className="xl:w-80 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between gap-3 text-left">
+                <div>
+                  <span className="text-[10px] uppercase tracking-widest text-teal-400 font-extrabold block mb-1">
+                    📋 CSS variables exporter
+                  </span>
+                  <p className="text-[9.5px] text-slate-400">
+                    Instantly copy current custom design values to your project root `index.css` declaration:
+                  </p>
+                </div>
+
+                <div className="font-mono text-[8.5px] bg-black/45 p-2 rounded-lg border border-slate-800 font-semibold text-emerald-400 overflow-x-auto max-h-[70px] select-all">
+                  {`--color-surface: ${remixStyle === 'custom' ? customSurface : remixStyle === 'obsidian-velvet' ? '#07080f' : remixStyle === 'cyber-emerald' ? '#020617' : remixStyle === 'glassmorphic-aurora' ? '#fafafc' : 'default'};`}
+                  <br />
+                  {`--color-primary: ${remixStyle === 'custom' ? customPrimary : remixStyle === 'obsidian-velvet' ? '#a78bfa' : remixStyle === 'cyber-emerald' ? '#10b981' : remixStyle === 'glassmorphic-aurora' ? '#f43f5e' : 'default'};`}
+                  <br />
+                  {`--radius-xl: ${remixStyle === 'custom' ? customRadius : '1rem'};`}
+                </div>
+
+                <button 
+                  onClick={() => {
+                    const code = `root {\n  --color-surface: ${remixStyle === 'custom' ? customSurface : '#07080f'};\n  --color-primary: ${remixStyle === 'custom' ? customPrimary : '#8b5cf6'};\n  --color-secondary: ${remixStyle === 'custom' ? customSecondary : '#14b8a6'};\n  --radius-xl: ${remixStyle === 'custom' ? customRadius : '1rem'};\n}`;
+                    navigator.clipboard.writeText(code);
+                    alert("Design variables copied to clipboard!");
+                  }}
+                  className="w-full py-1.5 bg-slate-800 hover:bg-slate-705 text-white hover:text-emerald-350 rounded-lg text-[10px] font-extrabold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                >
+                  <Copy className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Copy CSS Tokens</span>
+                </button>
+              </div>
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* Click capture overlays when dropdowns are open */}
       {(notificationsOpen || profileOpen) && (
